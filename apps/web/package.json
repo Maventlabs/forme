@@ -1,0 +1,47 @@
+{
+  "name": "@forme/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3100",
+    "build": "next build",
+    "start": "next start -p 3100",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/lib/project-input.test.ts src/lib/design-ir.test.ts src/lib/canvas-store.test.ts src/lib/project-preview.test.ts src/lib/provider-secrets.test.ts src/lib/gemini-provider.test.ts src/lib/ai-edit.test.ts src/lib/provider-input.test.ts src/lib/http-json.test.ts src/lib/provider-url.test.ts src/lib/chat-completions-provider.test.ts src/lib/anthropic-provider.test.ts",
+    "e2e:production": "tsx scripts/e2e/auth-projects.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@forme/design-ir": "workspace:*",
+    "@better-auth/drizzle-adapter": "1.7.6",
+    "@gsap/react": "2.1.2",
+    "@icons-pack/react-simple-icons": "13.15.1",
+    "@tanstack/react-query": "5.103.3",
+    "better-auth": "1.7.6",
+    "drizzle-orm": "0.45.3",
+    "gsap": "3.15.0",
+    "lucide-react": "1.48.0",
+    "next": "16.3.6",
+    "pg": "8.23.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.6.5",
+    "zustand": "5.0.12"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "24.13.6",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "dotenv": "18.0.4",
+    "drizzle-kit": "0.31.11",
+    "eslint": "9.39.3",
+    "eslint-config-next": "16.3.6",
+    "tailwindcss": "4.3.3",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}

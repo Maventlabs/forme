@@ -1,0 +1,11 @@
+.main { width: min(100% - 96px, 1040px); min-height: 66svh; margin: 0 auto; padding: clamp(90px, 10vw, 150px) 0 100px; }
+.intro { max-width: 840px; }
+.label { margin: 0 0 25px; color: var(--landing-subtle); font: 12px var(--font-mono); text-transform: uppercase; }
+.intro h1 { margin: 0; font-size: clamp(48px, 7vw, 86px); font-weight: 500; line-height: 1; letter-spacing: -.055em; }
+.intro > p:last-child { max-width: 620px; margin: 26px 0 0; color: var(--landing-muted); font-size: 20px; line-height: 1.5; }
+.details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; margin-top: 70px; padding-top: 28px; border-top: 1px solid var(--landing-border-strong); }
+.details p { margin: 0; color: var(--landing-muted); line-height: 1.7; }
+.actions { display: flex; flex-wrap: wrap; gap: 28px; margin-top: 64px; font-size: 14px; }
+.actions a { display: inline-flex; align-items: center; gap: 9px; border-bottom: 1px solid var(--landing-border-strong); padding-bottom: 6px; }
+.actions a:hover { border-color: var(--landing-ink); }
+@media (max-width: 720px) { .main { width: calc(100% - 40px); padding-top: 90px; } .details { grid-template-columns: 1fr; gap: 15px; } }

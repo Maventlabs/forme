@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# Build outputs
+.next/
+.turbo/
+dist/
+build/
+out/
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Environment & secrets — never commit real credentials.
+# Netlify builds do NOT read these files; set values in the Netlify UI.
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Keys & certificates
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# Logs & OS
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Test & coverage artifacts
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+
+# Editor & local caches
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+
+# Netlify local/dev artifacts (never deploy these)
+.netlify/
+netlify.toml.local
+
+# Local browser-automation artifacts (never commit)
+.playwright-mcp/

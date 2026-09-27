@@ -1,0 +1,109 @@
+.container { width: min(calc(100% - 96px), 1280px); margin-inline: auto; }
+.section { padding-block: clamp(96px, 10vw, 156px); }
+.kicker { display: block; margin-bottom: 22px; color: var(--landing-subtle); font: 500 11px/1.3 var(--font-mono); letter-spacing: .035em; }
+.intro { max-width: 720px; margin-bottom: 45px; }
+.intro h2, .copy h2, .pricingHead h2, .collectionLayout h2, .faqLayout h2, .closing h2 { margin: 0; font-size: clamp(39px, 4.5vw, 64px); font-weight: 500; line-height: 1.06; letter-spacing: -.045em; text-wrap: balance; }
+.intro p, .copy p, .pricingHead p, .collectionLayout p, .closing p { max-width: 560px; margin: 20px 0 0; color: var(--landing-muted); font-size: 17px; line-height: 1.6; }
+.textLink { display: inline-flex; align-items: center; gap: 11px; margin-top: 30px; padding-bottom: 5px; border-bottom: 1px solid var(--landing-border-strong); font-size: 14px; font-weight: 500; }
+.textLink:hover { border-color: var(--landing-ink); }
+.proof { background: var(--landing-surface); }
+.proofVisual { overflow: hidden; }
+.proofLegend { display: flex; justify-content: space-between; gap: 18px; padding-top: 15px; color: var(--landing-subtle); font: 11px var(--font-mono); }
+.split { display: grid; grid-template-columns: minmax(280px, .8fr) minmax(0, 1.2fr); align-items: center; gap: clamp(42px, 7vw, 110px); }
+.copy { max-width: 480px; }
+.providerSection { border-top: 1px solid var(--landing-border); }
+.providerStage { border: 1px solid var(--landing-border-strong); border-radius: var(--radius-lg); overflow: hidden; }
+.providerTop, .providerRow, .providerBottom { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 16px 23px; }
+.providerTop { background: var(--landing-surface); font-weight: 500; }
+.providerTop span { color: var(--landing-subtle); font: 10px var(--font-mono); }
+.providerRow { border-top: 1px solid var(--landing-border); font-size: 14px; }
+.providerRow span:last-child { color: var(--landing-subtle); font-size: 12px; text-align: right; }
+.providerRow:nth-last-child(2) { color: var(--landing-subtle); }
+.providerBottom { color: var(--landing-subtle); background: var(--landing-surface); font: 11px var(--font-mono); }
+.workflowSection { background: var(--landing-surface); }
+.workflowCards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.workflowCard { min-height: 320px; display: flex; flex-direction: column; justify-content: space-between; padding: 22px; border: 1px solid var(--landing-border); border-radius: var(--radius-lg); background: #fff; transition: transform .25s ease, border-color .25s ease; }
+.workflowCard:nth-child(2) { background: #eee; }
+.workflowCard:nth-child(3) { background: #f6f6f6; }
+.workflowCard:hover { transform: translateY(-6px); border-color: var(--landing-border-strong); }
+.workflowCardHead { display: flex; justify-content: space-between; align-items: center; color: var(--landing-subtle); font: 11px var(--font-mono); }
+.workflowCardHead svg { color: var(--landing-ink); }
+.workflowSketch { display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 18px; border: 1px solid var(--landing-border); }
+.workflowSketch i { width: 84%; height: 8px; background: #bababa; }
+.workflowSketch i:nth-child(2) { width: 57%; }
+.workflowSketch i:nth-child(3) { width: 90%; height: 25px; background: #ddd; }
+.workflowCard:nth-child(2) .workflowSketch i:nth-child(3) { width: 56%; align-self: flex-end; background: #999; }
+.workflowCard:nth-child(3) .workflowSketch i { width: 70%; }
+.workflowCard:nth-child(4) .workflowSketch i:nth-child(3) { width: 98%; background: #bdbdbd; }
+.workflowCard h3 { max-width: 240px; margin: 0; font-size: 23px; font-weight: 500; line-height: 1.15; letter-spacing: -.03em; }
+.workflowCard p { margin: 10px 0 0; color: var(--landing-muted); font-size: 13px; line-height: 1.5; }
+.pricingHead { display: grid; grid-template-columns: 1.05fr .95fr; align-items: end; gap: 70px; margin-bottom: 45px; }
+.pricingHead p { font-size: 15px; }
+.planGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.plan { display: flex; flex-direction: column; min-height: 460px; padding: 30px; border: 1px solid var(--landing-border-strong); border-radius: var(--radius-lg); background: #fff; }
+.planFeatured { border-color: var(--forme-crimson); }
+.planTop { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.planTop h3 { margin: 0; font-size: 25px; font-weight: 500; letter-spacing: -.035em; }
+.planTop > span { color: var(--forme-crimson); font: 10px var(--font-mono); }
+.planPrice { margin: 45px 0 10px; }
+.planPrice strong { font-size: 60px; font-weight: 500; line-height: 1; letter-spacing: -.06em; }
+.planPrice span { color: var(--landing-muted); font-size: 12px; }
+.planAudience { min-height: 42px; color: var(--landing-muted); font-size: 13px; line-height: 1.5; }
+.plan ul { list-style: none; margin: 26px 0 32px; padding: 20px 0 0; border-top: 1px solid var(--landing-border); }
+.plan li { position: relative; padding: 7px 0 7px 16px; font-size: 13px; }
+.plan li::before { position: absolute; left: 0; top: 14px; content: ''; width: 5px; height: 5px; background: var(--landing-ink); border-radius: 50%; }
+.plan > a { display: inline-flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: auto; padding: 12px 0 0; border-top: 1px solid var(--landing-border); font-size: 13px; }
+.plan > a:hover { color: var(--forme-crimson); }
+.priceNote { margin: 17px 0 0; color: var(--landing-subtle); font: 11px var(--font-mono); }
+.collectionSection { border-block: 1px solid var(--landing-border); background: var(--landing-surface); }
+.collectionLayout { display: grid; grid-template-columns: 1fr 1fr; gap: 100px; align-items: center; }
+.collectionNames { display: flex; flex-wrap: wrap; gap: 12px; align-content: center; }
+.collectionNames span { padding: 17px 22px; border: 1px solid var(--landing-border-strong); border-radius: var(--radius-sm); background: #fff; font-size: 16px; font-weight: 500; }
+.collectionNames span:first-child { font-size: 28px; letter-spacing: -.05em; }
+.faqLayout { display: grid; grid-template-columns: .7fr 1.3fr; gap: 100px; }
+.faqItems { border-top: 1px solid var(--landing-border-strong); }
+.faqItems details { border-bottom: 1px solid var(--landing-border); }
+.faqItems summary { position: relative; padding: 24px 38px 24px 0; cursor: pointer; list-style: none; font-size: 17px; font-weight: 500; }
+.faqItems summary::-webkit-details-marker { display: none; }
+.faqItems summary::after { position: absolute; right: 8px; top: 20px; content: '+'; font: 24px var(--font-sans); }
+.faqItems details[open] summary::after { content: '−'; }
+.faqItems details p { max-width: 620px; margin: 0 0 24px; color: var(--landing-muted); font-size: 15px; line-height: 1.6; }
+.closing { padding: 110px 0; border-top: 1px solid var(--landing-border); background-color: var(--landing-surface); background-image: linear-gradient(to right, rgb(0 0 0 / .025) 1px, transparent 1px), linear-gradient(to bottom, rgb(0 0 0 / .025) 1px, transparent 1px); background-size: 32px 32px; }
+.closingLayout { display: grid; grid-template-columns: 1fr .7fr; gap: 80px; align-items: center; }
+.closing h2 { font-size: clamp(52px, 6vw, 88px); }
+.closing p { max-width: 460px; }
+.primaryAction { display: inline-flex; align-items: center; gap: 12px; margin-top: 32px; padding: 16px 20px; border-radius: var(--radius-sm); background: var(--forme-crimson); color: #fff; font-size: 14px; font-weight: 500; transition: transform .22s ease, box-shadow .22s ease; }
+.primaryAction:hover { transform: translateY(-3px); box-shadow: 0 6px 14px rgb(0 0 0 / .12); }
+.closingVisual { min-height: 285px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; padding: 26px; background: #fff; border: 1px solid var(--landing-border-strong); border-radius: var(--radius-lg); }
+.closingVisual img { width: 100px; height: auto; }
+.closingVisual > div { display: grid; grid-template-columns: auto 1fr; gap: 8px 24px; width: 100%; border-top: 1px solid var(--landing-border); padding-top: 14px; font-size: 14px; }
+.closingVisual > div span:nth-child(odd) { color: var(--landing-subtle); font-family: var(--font-mono); }
+.footer { padding: 65px 0 28px; border-top: 1px solid var(--landing-border); }
+.footerTop { display: grid; grid-template-columns: 1fr 2fr; gap: 80px; }
+.footerBrand img { width: 145px; height: auto; }
+.footerBrand p { margin-top: 18px; color: var(--landing-muted); font-size: 13px; }
+.footerLinks { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+.footerLinks > div { display: flex; flex-direction: column; align-items: start; gap: 14px; }
+.footerLinks strong { margin-bottom: 10px; font-size: 13px; font-weight: 500; }
+.footerLinks a { color: var(--landing-muted); font-size: 13px; }
+.footerLinks a:hover { color: var(--landing-ink); }
+.footerBottom { display: flex; justify-content: space-between; margin-top: 100px; padding-top: 19px; border-top: 1px solid var(--landing-border); color: var(--landing-subtle); font: 11px var(--font-mono); }
+
+@media (max-width: 1000px) { .workflowCards { grid-template-columns: repeat(2, 1fr); } .faqLayout { gap: 50px; } .footerTop { grid-template-columns: 1fr; } }
+@media (max-width: 720px) {
+  .container { width: calc(100% - 40px); }
+  .section { padding-block: 82px; }
+  .intro { margin-bottom: 30px; }
+  .proofVisual { height: 270px; }
+  .proofVisual > div:first-child { width: 770px; transform: scale(.44); transform-origin: top left; }
+  .proofLegend { display: none; }
+  .split, .pricingHead, .collectionLayout, .faqLayout, .closingLayout { grid-template-columns: 1fr; gap: 35px; }
+  .workflowCards { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 10px; }
+  .workflowCard { flex: 0 0 min(82vw, 300px); scroll-snap-align: start; }
+  .planGrid { grid-template-columns: 1fr; }
+  .plan { min-height: 395px; }
+  .planPrice { margin-top: 28px; }
+  .footerLinks { grid-template-columns: repeat(2, 1fr); }
+  .footerBottom { margin-top: 60px; gap: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .workflowCard, .primaryAction { transition: none; } .workflowCard:hover, .primaryAction:hover { transform: none; } }

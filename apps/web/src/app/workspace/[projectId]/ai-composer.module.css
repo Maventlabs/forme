@@ -1,0 +1,42 @@
+.composer { position: absolute; z-index: 5; bottom: 77px; left: 50%; width: min(470px, calc(100% - 24px)); max-height: min(390px, 54vh); overflow-y: auto; transform: translateX(-50%); border: 1px solid var(--ws-border-strong); border-radius: 11px; background: var(--ws-panel); color: var(--ws-text); box-shadow: 0 12px 34px rgb(0 0 0 / 30%); }
+.providerPanel { padding: 11px 12px 10px; border-bottom: 1px solid var(--ws-border); }
+.providerHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.providerHeading > div { min-width: 0; }
+.providerHeading p { margin: 0 0 3px; color: var(--ws-text-subtle); font-family: var(--font-mono); font-size: 8px; letter-spacing: .08em; }
+.providerHeading h3 { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ws-text); font-size: 11px; font-weight: 500; }
+.connectedState { color: var(--ws-text-muted); font-size: 9px; }
+.connectForm { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; margin-top: 10px; }
+.connectForm label, .connectForm small { grid-column: 1 / -1; color: var(--ws-text-subtle); font-size: 9px; }
+.connectForm input, .modelSelect { min-width: 0; min-height: 34px; padding: 0 9px; border: 1px solid var(--ws-border-strong); border-radius: 6px; background: var(--ws-canvas); color: var(--ws-text); font-size: 10px; }
+.connectForm input::placeholder { color: var(--ws-text-subtle); }
+.connectForm button, .providerActions button { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 9px; border: 1px solid var(--ws-border-strong); border-radius: 6px; background: var(--ws-surface); color: var(--ws-text); cursor: pointer; font-size: 9px; white-space: nowrap; }
+.connectForm button:hover:not(:disabled), .providerActions button:hover:not(:disabled) { background: var(--ws-surface-hover); }
+.connectForm button:disabled, .providerActions button:disabled { cursor: wait; opacity: .55; }
+.modelLabel { display: block; margin: 9px 0 5px; color: var(--ws-text-subtle); font-size: 9px; }
+.modelSelect { width: 100%; }
+.providerActions { display: flex; gap: 6px; margin-top: 7px; }
+.providerMessage, .providerError { margin: 7px 0 0; color: var(--ws-text-muted); font-size: 9px; line-height: 1.45; }
+.providerError { color: var(--ws-text); }
+.composerForm { display: grid; gap: 7px; padding: 10px 12px 11px; }
+.scope { overflow: hidden; color: var(--ws-text-subtle); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.composerForm textarea { width: 100%; min-height: 54px; max-height: 110px; resize: vertical; padding: 8px 9px; border: 1px solid var(--ws-border); border-radius: 7px; outline: 0; background: var(--ws-canvas); color: var(--ws-text); font-size: 10px; line-height: 1.45; }
+.composerForm textarea:focus-visible { border-color: var(--ws-border-strong); outline-color: var(--ws-selection); }
+.composerForm textarea::placeholder { color: var(--ws-text-subtle); }
+.composerFooter { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.composerHint { color: var(--ws-text-subtle); font-size: 9px; }
+.sendButton { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--ws-border-strong); border-radius: 7px; background: var(--ws-selection); color: var(--ws-selection-ink); cursor: pointer; }
+.sendButton:hover:not(:disabled) { background: var(--ws-text); }
+.sendButton:disabled { cursor: not-allowed; opacity: .42; }
+.generationStatus { margin: 0; color: var(--ws-text-muted); font-size: 9px; line-height: 1.45; }
+.checkStatus { min-height: 30px; padding: 0 8px; border: 1px solid var(--ws-border); border-radius: 6px; background: var(--ws-surface); color: var(--ws-text-muted); cursor: pointer; font-size: 9px; }
+.checkStatus:disabled { cursor: wait; opacity: .5; }
+
+@media (max-width: 640px) {
+  .composer { bottom: 70px; width: calc(100% - 16px); max-height: 48vh; }
+  .providerPanel { padding-inline: 10px; }
+  .composerForm { padding-inline: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer, .sendButton { transition: none; }
+}

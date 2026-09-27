@@ -1,0 +1,16 @@
+.section { padding: 32px 0 43px; border-top: 1px solid var(--landing-border); border-bottom: 1px solid var(--landing-border); background: var(--landing-canvas); }
+.labelRow { width: min(calc(100% - 96px), 1280px); display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 auto 25px; }
+.label { margin: 0; color: var(--landing-muted); font-size: 12px; }
+.label span { color: var(--landing-subtle); }
+.labelRow button { flex: 0 0 auto; padding: 6px 9px; border: 1px solid var(--landing-border); border-radius: var(--radius-xs); background: #fff; color: var(--landing-muted); font-size: 11px; cursor: pointer; }
+.labelRow button:hover { border-color: var(--landing-border-strong); color: var(--landing-ink); }
+.window { overflow: hidden; }
+.track { display: flex; width: max-content; animation: move-left 34s linear infinite; }
+.paused .track { animation-play-state: paused; }
+.set { display: flex; flex-shrink: 0; align-items: center; gap: clamp(54px, 7vw, 120px); padding-inline: clamp(27px, 3.5vw, 60px); }
+.mark { display: inline-flex; flex-shrink: 0; align-items: center; gap: 14px; color: var(--landing-muted); font-size: 17px; font-weight: 500; letter-spacing: -.025em; white-space: nowrap; }
+.mark svg { color: var(--landing-ink); }
+.mark img { object-fit: contain; }
+@keyframes move-left { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .track { animation: none; } .labelRow button { display: none; } }
+@media (max-width: 720px) { .labelRow { width: calc(100% - 40px); align-items: flex-start; } .label { line-height: 1.5; } .mark { font-size: 14px; } }

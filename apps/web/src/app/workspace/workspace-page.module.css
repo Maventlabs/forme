@@ -1,0 +1,7 @@
+.main { width: min(calc(100% - 96px), 1280px); min-height: 90svh; margin-inline: auto; padding: 82px 0 100px; }
+.main h1 { max-width: 920px; margin: 0; font-size: clamp(43px, 6vw, 78px); line-height: 1.02; font-weight: 500; letter-spacing: -.05em; }
+.main > p { max-width: 660px; margin: 22px 0 0; color: var(--landing-muted); font-size: 17px; line-height: 1.6; }
+.stage { margin-top: 48px; }
+.main .note { max-width: none; font: 12px var(--font-mono); }
+@media (max-width: 720px) { .main { width: calc(100% - 40px); padding-top: 60px; } .stage { overflow: hidden; height: 250px; } .stage > div { width: 770px; height: 560px; transform: scale(.44); transform-origin: top left; } }
+@media (max-width: 380px) { .stage { height: 210px; } .stage > div { transform: scale(.35); } }

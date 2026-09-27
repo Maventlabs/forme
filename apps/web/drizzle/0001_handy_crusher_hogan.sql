@@ -1,0 +1,2 @@
+ALTER TABLE "projects" ADD COLUMN "canvas" jsonb DEFAULT '{"schemaVersion":1,"nodes":{},"rootIds":[],"breakpoints":{"desktop":{"width":1440,"height":"auto"},"tablet":{"width":768,"height":"auto"},"mobile":{"width":390,"height":"auto"}},"designContextRef":null}'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "projects" ADD COLUMN "canvas_revision" integer DEFAULT 0 NOT NULL;
