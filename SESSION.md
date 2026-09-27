@@ -22,7 +22,7 @@
 | Execution mode | Production breadth pass; backend/durable behavior before frontend polish |
 | Status | Provider batch implemented + verified by unit/contract tests, typecheck, lint, production build. Gemini keeps prior real-provider E2E evidence; other adapters are implemented / credential verification pending (no fake PASS). README + netlify.toml + gitignore added. No deployment run; no secrets exposed. |
 | Next action | Run full `pnpm e2e:production` (Gemini + OpenAI-Compatible env bila tersedia) on a fresh controlled build, then implement scoped `appendChild` + timeout recovery. |
-| Last verified commit | pending — netlify.toml secrets-scan + ignore fix staged for push; live site https://forme-apps.netlify.app |
+| Last verified commit | 5eb760e — netlify.toml secrets-scan + ignore fix, pushed; `main` in sync; live site https://forme-apps.netlify.app rebuilding |
 | Last verified environment | Windows workspace, Node 24.9.0, pnpm 11.17.0, Next.js 16.3.6; isolated Neon `forme-dev`; latest `pnpm e2e:production` passed against a fresh local production build at `localhost:3101` with temporary auth-origin override; no Git repository |
 | Last updated | 2026-09-26 |
 
