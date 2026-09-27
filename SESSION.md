@@ -22,7 +22,7 @@
 | Execution mode | Production breadth pass; backend/durable behavior before frontend polish |
 | Status | Provider batch implemented + verified by unit/contract tests, typecheck, lint, production build. Gemini keeps prior real-provider E2E evidence; other adapters are implemented / credential verification pending (no fake PASS). README + netlify.toml + gitignore added. No deployment run; no secrets exposed. |
 | Next action | Run full `pnpm e2e:production` (Gemini + OpenAI-Compatible env bila tersedia) on a fresh controlled build, then implement scoped `appendChild` + timeout recovery. |
-| Last verified commit | d409bad — lazy-auth Netlify build fix, pushed to https://github.com/Maventlabs/forme (`main` in sync with `origin/main`) |
+| Last verified commit | 0e10088 — sitemap/robots SEO, pushed to https://github.com/Maventlabs/forme (`main` in sync with `origin/main`); live site https://forme-apps.netlify.app redeploying from `main` |
 | Last verified environment | Windows workspace, Node 24.9.0, pnpm 11.17.0, Next.js 16.3.6; isolated Neon `forme-dev`; latest `pnpm e2e:production` passed against a fresh local production build at `localhost:3101` with temporary auth-origin override; no Git repository |
 | Last updated | 2026-09-26 |
 
@@ -888,6 +888,16 @@ Local synthetic fixtures may validate schemas and queries but must never be repo
 | Tools/skills | `using-superpowers`, `brainstorming` (bounded path), `ponytail`, `incremental-implementation`, `test-driven-development`, `api-and-interface-design`, `security-and-hardening`, `neon-postgres`, `nextjs-app-router-patterns`, `ai-debt-detector`, `verification-before-completion`, `documentation-and-adrs`; 4 sub-agent read-only (provider-contract research, BYOK security review, E2E coverage, SSRF helper + test). No browser automation. |
 | Blockers | Kredensial real untuk 11 provider non-Gemini belum tersedia (expected); `E2E_OPENAI_COMPATIBLE_*` opsional bila owner menyediakan; public deploy tetap menunggu DB production + domain + env final. |
 | Next action | Fresh production build + `pnpm e2e:production` (wajib Gemini bila `E2E_REQUIRE_GEMINI=true`); lalu scoped `appendChild`, timeout recovery, dan P0 lanjutan sesuai dependency order. |
+
+### 2026-09-27 — Sitemap/robots SEO + redeploy to forme-apps.netlify.app
+
+| Field | Evidence |
+|---|---|
+| Scope | `app/sitemap.ts` (11 halaman publik, prioritas + changefreq), `app/robots.ts` (allow `/`, disallow `/api/ /projects /generator /cloning /workspace/`, Sitemap absolut), `lib/site-url.ts` (kanonis via `SITE_URL` → `BETTER_AUTH_URL` → localhost fallback; never-throw agar build aman) + test, `.env.example` (`SITE_URL` opsional terdokumentasi). Private routes + API sengaja tidak di-index. |
+| Verification | `typecheck` PASS; `lint` PASS; full `pnpm test` 52/52 PASS; production `next build` PASS dengan route `○ /robots.txt` dan `○ /sitemap.xml`. |
+| Git/deploy | Commit `0e10088`, push `d409bad..0e10088 main -> main`, sinkron. Netlify redeploy otomatis dari `main` ke https://forme-apps.netlify.app. |
+| Action required (owner, Netlify UI) | Set `BETTER_AUTH_URL=https://forme-apps.netlify.app` (wajib untuk auth + kanonis sitemap) dan 4 runtime vars lain, lalu redeploy bila env baru ditambahkan. Opsional: `SITE_URL` bila kanonis SEO ingin dipisah dari auth origin. Verifikasi: buka `/robots.txt`, `/sitemap.xml`, daftarkan properti di Search Console + submit sitemap. |
+| Next action | Konfirmasi deploy hijau di Netlify; fresh production build + full `pnpm e2e:production`; lalu scoped `appendChild` + timeout recovery. |
 
 ### 2026-09-27 — Netlify build fix (lazy auth) + recommit
 
