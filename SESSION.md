@@ -22,7 +22,7 @@
 | Execution mode | Production breadth pass; backend/durable behavior before frontend polish |
 | Status | Provider batch implemented + verified by unit/contract tests, typecheck, lint, production build. Gemini keeps prior real-provider E2E evidence; other adapters are implemented / credential verification pending (no fake PASS). README + netlify.toml + gitignore added. No deployment run; no secrets exposed. |
 | Next action | Run full `pnpm e2e:production` (Gemini + OpenAI-Compatible env bila tersedia) on a fresh controlled build, then implement scoped `appendChild` + timeout recovery. |
-| Last verified commit | None — this directory and checked parent are not Git repositories |
+| Last verified commit | 9550eec — Initial commit pushed to https://github.com/Maventlabs/forme (`main` tracks `origin/main`) |
 | Last verified environment | Windows workspace, Node 24.9.0, pnpm 11.17.0, Next.js 16.3.6; isolated Neon `forme-dev`; latest `pnpm e2e:production` passed against a fresh local production build at `localhost:3101` with temporary auth-origin override; no Git repository |
 | Last updated | 2026-09-26 |
 
@@ -888,6 +888,14 @@ Local synthetic fixtures may validate schemas and queries but must never be repo
 | Tools/skills | `using-superpowers`, `brainstorming` (bounded path), `ponytail`, `incremental-implementation`, `test-driven-development`, `api-and-interface-design`, `security-and-hardening`, `neon-postgres`, `nextjs-app-router-patterns`, `ai-debt-detector`, `verification-before-completion`, `documentation-and-adrs`; 4 sub-agent read-only (provider-contract research, BYOK security review, E2E coverage, SSRF helper + test). No browser automation. |
 | Blockers | Kredensial real untuk 11 provider non-Gemini belum tersedia (expected); `E2E_OPENAI_COMPATIBLE_*` opsional bila owner menyediakan; public deploy tetap menunggu DB production + domain + env final. |
 | Next action | Fresh production build + `pnpm e2e:production` (wajib Gemini bila `E2E_REQUIRE_GEMINI=true`); lalu scoped `appendChild`, timeout recovery, dan P0 lanjutan sesuai dependency order. |
+
+### 2026-09-27 — Readiness report + initial GitHub push
+
+| Field | Evidence |
+|---|---|
+| Readiness | ~55% production-ready (backend/durable behavior, pre-UI-polish). Rubric 10 slice: landing 90, auth/projects 80, canvas persistence 75, responsive boundary 50, provider/Composer 65, presets/DESIGN.md 0, storage 0, share/export 0, QA/security/observability 30, deploy/ops 20. Full E2E rerun after provider batch still pending; final FE redesign explicitly deferred. |
+| Git | `git init` di repo root; `.env.local` verified ignored (`check-ignore` → `.gitignore:18:.env.*`); secret scan clean (no `AIza`/`sk-`/`ghp_`/tokens di file committable); `.playwright-mcp/` (10.7MB) di-ignore; `echo "# forme"` sengaja dilewati agar README lengkap tidak rusak; `git add -A` = 157 files; commit `9550eec`; `branch -M main`; remote `Maventlabs/forme`; `git push -u origin main` → `[new branch] main -> main`, tracking aktif. |
+| Next action | Fresh production build + full `pnpm e2e:production`, lalu scoped `appendChild` + timeout recovery. |
 
 ### 2026-09-26 — Temporary Netlify readiness and environment setup
 
