@@ -22,7 +22,7 @@
 | Execution mode | Production breadth pass; backend/durable behavior before frontend polish |
 | Status | Provider batch implemented + verified by unit/contract tests, typecheck, lint, production build. Gemini keeps prior real-provider E2E evidence; other adapters are implemented / credential verification pending (no fake PASS). README + netlify.toml + gitignore added. No deployment run; no secrets exposed. |
 | Next action | Run full `pnpm e2e:production` (Gemini + OpenAI-Compatible env bila tersedia) on a fresh controlled build, then implement scoped `appendChild` + timeout recovery. |
-| Last verified commit | 9550eec — Initial commit pushed to https://github.com/Maventlabs/forme (`main` tracks `origin/main`) |
+| Last verified commit | d409bad — lazy-auth Netlify build fix, pushed to https://github.com/Maventlabs/forme (`main` in sync with `origin/main`) |
 | Last verified environment | Windows workspace, Node 24.9.0, pnpm 11.17.0, Next.js 16.3.6; isolated Neon `forme-dev`; latest `pnpm e2e:production` passed against a fresh local production build at `localhost:3101` with temporary auth-origin override; no Git repository |
 | Last updated | 2026-09-26 |
 
@@ -888,6 +888,17 @@ Local synthetic fixtures may validate schemas and queries but must never be repo
 | Tools/skills | `using-superpowers`, `brainstorming` (bounded path), `ponytail`, `incremental-implementation`, `test-driven-development`, `api-and-interface-design`, `security-and-hardening`, `neon-postgres`, `nextjs-app-router-patterns`, `ai-debt-detector`, `verification-before-completion`, `documentation-and-adrs`; 4 sub-agent read-only (provider-contract research, BYOK security review, E2E coverage, SSRF helper + test). No browser automation. |
 | Blockers | Kredensial real untuk 11 provider non-Gemini belum tersedia (expected); `E2E_OPENAI_COMPATIBLE_*` opsional bila owner menyediakan; public deploy tetap menunggu DB production + domain + env final. |
 | Next action | Fresh production build + `pnpm e2e:production` (wajib Gemini bila `E2E_REQUIRE_GEMINI=true`); lalu scoped `appendChild`, timeout recovery, dan P0 lanjutan sesuai dependency order. |
+
+### 2026-09-27 — Netlify build fix (lazy auth) + recommit
+
+| Field | Evidence |
+|---|---|
+| Root cause | `src/lib/auth.ts` threw `BETTER_AUTH_SECRET is required in production` at module scope; `next build` page-data collection imports route modules → build exit 2 on Netlify. |
+| Fix | `getAuth()` lazy + cached init; `[...all]/route.ts` resolves handlers per request; `server-session.ts` calls `getAuth()` at request time. Fail-fast secret validation preserved for real requests; static/landing build no longer blocked. |
+| Verification | `typecheck` PASS; `lint` PASS; `scripts/build-env-safety.ts` PASS (import without secrets does not throw; `getAuth()` throws the exact secret error); full `pnpm test` 51/51 PASS; local production `next build` PASS. No `.env.local` read or staged. |
+| Git | Commit `d409bad`, fast-forward push `91f7d39..d409bad main -> main`; remote `origin/main` = local. |
+| Still required on Netlify | Set 5 runtime vars in UI (`DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `PROVIDER_SECRET_ENCRYPTION_KEY`, `PROVIDER_SECRET_ENCRYPTION_KEY_ID`), then redeploy/bersihkan cache bila perlu. Tanpa itu build lolos tapi request auth akan 500 fail-fast. |
+| Next action | Redeploy Netlify; fresh production build + full `pnpm e2e:production`; lalu scoped `appendChild` + timeout recovery. |
 
 ### 2026-09-27 — Readiness report + initial GitHub push
 
