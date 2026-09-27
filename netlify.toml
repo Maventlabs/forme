@@ -8,14 +8,20 @@
   base = "."
   command = "pnpm --filter @forme/web build"
   publish = "apps/web/.next"
-  # Only rebuild when the web app or shared packages change; docs-only
-  # edits should not trigger a production deploy.
-  ignore = "git diff --quiet HEAD^ HEAD -- apps/web/ packages/ pnpm-workspace.yaml pnpm-lock.yaml package.json netlify.toml"
+  # Only rebuild when the web app, shared packages, or build config change;
+  # docs-only edits should not trigger a production deploy. NOTE: netlify.toml
+  # itself is intentionally NOT in this list so config fixes always rebuild.
+  ignore = "git diff --quiet HEAD^ HEAD -- apps/web/ packages/ pnpm-workspace.yaml pnpm-lock.yaml package.json"
 
 [build.environment]
   NODE_VERSION = "24"
   # pnpm version is pinned via the root package.json `packageManager` field
   # (corepack). Do not install dependencies with npm here.
+  # E2E_BASE_URL and BETTER_AUTH_URL hold public URLs (localhost/site origin),
+  # not secrets — exclude them from secret scanning so their documented values
+  # in code/docs don't fail the build. Real secrets (DATABASE_URL,
+  # BETTER_AUTH_SECRET, PROVIDER_SECRET_ENCRYPTION_KEY) stay scanned.
+  SECRETS_SCAN_OMIT_KEYS = "E2E_BASE_URL, BETTER_AUTH_URL"
 
 # Next.js App Router (OpenNext adapter) handles routing, SSR, and API routes.
 # No custom redirects: adding [[redirects]] splats here can shadow

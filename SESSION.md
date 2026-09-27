@@ -22,7 +22,7 @@
 | Execution mode | Production breadth pass; backend/durable behavior before frontend polish |
 | Status | Provider batch implemented + verified by unit/contract tests, typecheck, lint, production build. Gemini keeps prior real-provider E2E evidence; other adapters are implemented / credential verification pending (no fake PASS). README + netlify.toml + gitignore added. No deployment run; no secrets exposed. |
 | Next action | Run full `pnpm e2e:production` (Gemini + OpenAI-Compatible env bila tersedia) on a fresh controlled build, then implement scoped `appendChild` + timeout recovery. |
-| Last verified commit | 7945336 — Search Console verification via layout metadata (HTML file kept as fallback), pushed; `main` in sync; live site https://forme-apps.netlify.app redeploying |
+| Last verified commit | pending — netlify.toml secrets-scan + ignore fix staged for push; live site https://forme-apps.netlify.app |
 | Last verified environment | Windows workspace, Node 24.9.0, pnpm 11.17.0, Next.js 16.3.6; isolated Neon `forme-dev`; latest `pnpm e2e:production` passed against a fresh local production build at `localhost:3101` with temporary auth-origin override; no Git repository |
 | Last updated | 2026-09-26 |
 
@@ -888,6 +888,16 @@ Local synthetic fixtures may validate schemas and queries but must never be repo
 | Tools/skills | `using-superpowers`, `brainstorming` (bounded path), `ponytail`, `incremental-implementation`, `test-driven-development`, `api-and-interface-design`, `security-and-hardening`, `neon-postgres`, `nextjs-app-router-patterns`, `ai-debt-detector`, `verification-before-completion`, `documentation-and-adrs`; 4 sub-agent read-only (provider-contract research, BYOK security review, E2E coverage, SSRF helper + test). No browser automation. |
 | Blockers | Kredensial real untuk 11 provider non-Gemini belum tersedia (expected); `E2E_OPENAI_COMPATIBLE_*` opsional bila owner menyediakan; public deploy tetap menunggu DB production + domain + env final. |
 | Next action | Fresh production build + `pnpm e2e:production` (wajib Gemini bila `E2E_REQUIRE_GEMINI=true`); lalu scoped `appendChild`, timeout recovery, dan P0 lanjutan sesuai dependency order. |
+
+### 2026-09-27 — Netlify secrets-scan + ignore fix (via netlify.toml)
+
+| Field | Evidence |
+|---|---|
+| Root causes | (1) Netlify secret scanning flagged `E2E_BASE_URL`/`BETTER_AUTH_URL` values (`localhost`/site URL, bukan secret) yang terdokumentasi di code/docs → build gagal. (2) Commit SESSION-only ter-cancel oleh ignore command — by design; (3) `netlify.toml` ada di ignore list sehingga config fix tidak memicu rebuild. |
+| Fix | `netlify.toml`: `SECRETS_SCAN_OMIT_KEYS = "E2E_BASE_URL, BETTER_AUTH_URL"` (format comma-separated sesuai docs; real secrets tetap di-scan); `netlify.toml` dikeluarkan dari ignore paths agar config fix selalu rebuild; TOML divalidasi (`TOML VALID`). |
+| Verification | `python tomllib` parse PASS. Build/deploy verification menunggu Netlify (commit ini menyentuh `netlify.toml` → build jalan). |
+| Still recommended (Netlify UI, opsional) | Hapus `E2E_*` dan `DATABASE_URL_UNPOOLED` dari site env (tidak dibutuhkan runtime production). |
+| Next action | Pantau deploy Netlify hijau; verifikasi `/robots.txt`, `/sitemap.xml`, dan meta verifikasi di view-source; klik Verify di Search Console. |
 
 ### 2026-09-27 — Sitemap/robots SEO + redeploy to forme-apps.netlify.app
 
