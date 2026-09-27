@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: 'FORME by Mavent',
   description: 'A wireframe-first design workspace for the way you build.',
   icons: { icon: '/brand/forme/forme-app-icon-light.png' },
+  verification: { google: 'V6yTCvWUtOEAsGiTNhJxgbUsCUS2R3s9MjpLBeGmFAE' },
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
