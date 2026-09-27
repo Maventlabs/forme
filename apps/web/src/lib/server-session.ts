@@ -1,6 +1,6 @@
 import { headers } from 'next/headers'
-import { auth } from '@/lib/auth'
+import { getAuth } from '@/lib/auth'
 
 export function getServerSession() {
-  return headers().then((requestHeaders) => auth.api.getSession({ headers: requestHeaders }))
+  return headers().then((requestHeaders) => getAuth().api.getSession({ headers: requestHeaders }))
 }
