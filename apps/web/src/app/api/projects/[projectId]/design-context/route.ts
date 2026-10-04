@@ -8,7 +8,9 @@ import { MAX_DESIGN_CONTEXT_BYTES, hasDesignContextRules, parseDesignContext } f
 import { designPresets } from '@/lib/design-presets'
 import { mutationFailureResponse, readJsonBody } from '@/lib/http-json'
 import { getServerSession } from '@/lib/server-session'
-import { providerFailure, providerJson } from '@/lib/provider-http'
+import { checkInProcessRate, rateLimitRules } from '@/lib/rate-limit'
+import { getRequestId, providerFailure, providerJson } from '@/lib/provider-http'
+import { log } from '@/lib/observability/logger'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -56,11 +58,24 @@ export async function GET(_request: Request, { params }: RouteContext) {
 }
 
 export async function POST(request: Request, { params }: RouteContext) {
+  const requestId = await getRequestId()
   const invalidMutation = mutationFailureResponse(request)
-  if (invalidMutation) return invalidMutation
+  if (invalidMutation) {
+    log.warn('auth.security_rejection', { route: '/api/projects/:id/design-context', reason: invalidMutation.status }, requestId)
+    return invalidMutation
+  }
   const session = await getServerSession()
-  if (!session) return providerJson({ error: 'UNAUTHORIZED' }, 401)
+  if (!session) {
+    log.warn('auth.rejected', { route: '/api/projects/:id/design-context' }, requestId)
+    return providerJson({ error: 'UNAUTHORIZED' }, 401)
+  }
   const { projectId } = await params
+
+  const rateLimit = checkInProcessRate(rateLimitRules.designContextApply, session.user.id)
+  if (!rateLimit.allowed) {
+    log.warn('auth.security_rejection', { route: '/api/projects/:id/design-context', reason: 'rate_limited' }, requestId)
+    return providerJson({ error: 'RATE_LIMITED', retryAfterSeconds: rateLimit.retryAfterSeconds }, 429)
+  }
 
   const body = await readJsonBody(request)
   if (!body.ok) return providerJson({ error: body.status === 413 ? 'BODY_TOO_LARGE' : body.status === 415 ? 'JSON_REQUIRED' : 'INVALID_JSON' }, body.status)
@@ -115,9 +130,16 @@ export async function POST(request: Request, { params }: RouteContext) {
       }
     })
 
+    log.info('design_context.applied', {
+      projectId,
+      sourceType: input.data.sourceType,
+      applied: input.data.apply,
+      revision,
+    }, requestId)
+
     return providerJson({ context: { sourceType: input.data.sourceType, parsedRules }, revision }, 201)
   } catch (error) {
-    return providerFailure(error)
+    return providerFailure(error, { operation: 'design_context_apply', requestId })
   }
 }
 

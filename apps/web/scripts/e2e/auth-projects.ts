@@ -1168,6 +1168,7 @@ async function runAssetJourney(baseUrl: URL, ownerJar: CookieJar, otherJar: Cook
     assert.equal(listed.status, 200, 'asset listing must still answer for an authenticated owner')
     assert.deepEqual((await listed.json() as { assets?: unknown[] }).assets, [], 'no asset may be recorded without durable storage')
     pass('asset upload is validated and fails honestly with STORAGE_UNAVAILABLE (no fake upload, no metadata row)')
+    await runSecurityHardeningJourney(baseUrl, ownerJar, otherJar)
     return
   }
 
@@ -1193,6 +1194,89 @@ async function runAssetJourney(baseUrl: URL, ownerJar: CookieJar, otherJar: Cook
   const deleted = await request(baseUrl, `/api/assets/${prepared.asset!.id}`, { method: 'DELETE', jar: ownerJar })
   assert.equal(deleted.status, 204, 'owner must be able to delete an asset and its stored object')
   pass('asset upload, validation, confirmation, ownership isolation, and deletion verified against durable storage')
+  await runSecurityHardeningJourney(baseUrl, ownerJar, otherJar)
+}
+
+async function runSecurityHardeningJourney(baseUrl: URL, ownerJar: CookieJar, otherJar: CookieJar) {
+  const created = await request(baseUrl, '/api/projects', {
+    method: 'POST', json: { name: `FORME E2E security ${runId}` }, jar: ownerJar,
+  })
+  assert.equal(created.status, 201, 'security journey must have its own project')
+  const projectId = (await created.json() as { project?: { id?: string } }).project?.id
+  assert.equal(typeof projectId, 'string')
+  projectIds.add(projectId as string)
+
+  // Cross-origin and simple-content-type mutations must be refused before
+  // they can reach any credential, storage or AI boundary.
+  const crossOriginConnect = await fetch(new URL('/api/providers/connect', baseUrl), {
+    method: 'POST',
+    headers: { origin: 'https://attacker.example', 'content-type': 'application/json' },
+    body: JSON.stringify({ provider: 'openai', apiKey: 'x'.repeat(32) }),
+  })
+  assert.equal(crossOriginConnect.status, 403, 'a foreign-origin credential write must be refused')
+
+  const simpleTypeConnect = await fetch(new URL('/api/providers/connect', baseUrl), {
+    method: 'POST',
+    headers: { origin: baseUrl.origin, 'content-type': 'text/plain' },
+    body: JSON.stringify({ provider: 'openai', apiKey: 'x'.repeat(32) }),
+  })
+  assert.equal(simpleTypeConnect.status, 415, 'a simple content type must not reach a credential boundary')
+
+  const unknownProvider = await request(baseUrl, '/api/providers/connect', {
+    method: 'POST', json: { provider: 'some-unknown-provider', apiKey: 'x'.repeat(32) }, jar: ownerJar,
+  })
+  assert.equal(unknownProvider.status, 422, 'unknown provider ids must be rejected')
+
+  const comingSoonProvider = await request(baseUrl, '/api/providers/connect', {
+    method: 'POST', json: { provider: 'ignix', apiKey: 'x'.repeat(32) }, jar: ownerJar,
+  })
+  assert.equal(comingSoonProvider.status, 422, 'Ignix stays Coming Soon and must not accept a credential')
+
+  // A custom provider Base URL must never be allowed to reach private space.
+  const rejectedBaseUrls: Array<[string, string]> = [
+    ['https://127.0.0.1/v1', 'IP-literal custom provider hosts must be rejected'],
+    ['http://models.example/v1', 'plain HTTP custom provider endpoints must be rejected'],
+    ['https://user:pass@models.example/v1', 'credentials embedded in a provider URL must be rejected'],
+    ['https://models.example/v1/v1', 'duplicate version path segments must be rejected'],
+    ['https://models.example/v1?key=abc', 'query strings on a provider URL must be rejected'],
+  ]
+  for (const [customBaseUrl, message] of rejectedBaseUrls) {
+    const response = await request(baseUrl, '/api/providers/connect', {
+      method: 'POST',
+      json: { provider: 'openai-compatible', apiKey: 'x'.repeat(32), baseUrl: customBaseUrl },
+      jar: ownerJar,
+    })
+    assert.equal(response.status, 422, message)
+  }
+
+  // Foreign-resource access must not disclose that another owner exists.
+  for (const path of [
+    `/api/projects/${projectId}/preset`,
+    `/api/projects/${projectId}/design-context`,
+    `/api/projects/${projectId}/shares`,
+    `/api/projects/${projectId}/export?format=json`,
+  ]) {
+    const response = await request(baseUrl, path, { jar: otherJar })
+    assert.ok([403, 404].includes(response.status), `${path} must not be readable by another user (got ${response.status})`)
+  }
+
+  const foreignGenerate = await request(baseUrl, `/api/projects/${projectId}/generate`, {
+    method: 'POST',
+    json: { nodeId: randomUUID(), expectedRevision: 0, idempotencyKey: randomUUID(), provider: 'openai', modelId: 'any', instruction: 'edit' },
+    jar: otherJar,
+  })
+  assert.equal(foreignGenerate.status, 404, 'another user must not learn that a private project exists through generation')
+
+  const foreignDelete = await request(baseUrl, `/api/assets/${randomUUID()}`, { method: 'DELETE', jar: otherJar })
+  assert.equal(foreignDelete.status, 404, 'asset deletion must be scoped to the owner')
+
+  // Share enumeration must not be distinguishable or guessable.
+  for (const token of ['not-a-real-share-token-value-at-all', 'a'.repeat(43), '../../etc/passwd']) {
+    const response = await request(baseUrl, `/api/share/${encodeURIComponent(token)}`)
+    assert.equal(response.status, 404, `malformed share tokens must 404 (got ${response.status})`)
+  }
+
+  pass('auth/ownership boundaries, custom provider URL hardening, and share-token enumeration resistance verified')
 }
 
 export async function runProductionE2E(targetBaseUrl: URL, databaseUrl: string) {

@@ -10,6 +10,8 @@ import { getProviderAdapter } from '@/lib/provider-adapters'
 import { completeGenerationJob, claimGenerationJob, finishGenerationJob, getOwnedGenerationJobForRequest } from '@/lib/generation-persistence'
 import { getOwnedProviderConnection } from '@/lib/provider-service'
 import { providerFailure, providerJson } from '@/lib/provider-http'
+import { getRequestId } from '@/lib/provider-http'
+import { log } from '@/lib/observability/logger'
 import { mutationFailureResponse } from '@/lib/http-json'
 
 export const runtime = 'nodejs'
@@ -18,10 +20,17 @@ export const dynamic = 'force-dynamic'
 type RouteContext = { params: Promise<{ projectId: string }> }
 
 export async function POST(request: Request, { params }: RouteContext) {
+  const requestId = await getRequestId()
   const invalidMutation = mutationFailureResponse(request)
-  if (invalidMutation) return invalidMutation
+  if (invalidMutation) {
+    log.warn('auth.security_rejection', { route: '/api/projects/:id/generate', reason: invalidMutation.status }, requestId)
+    return invalidMutation
+  }
   const session = await getServerSession()
-  if (!session) return providerJson({ error: 'UNAUTHORIZED' }, 401)
+  if (!session) {
+    log.warn('auth.rejected', { route: '/api/projects/:id/generate' }, requestId)
+    return providerJson({ error: 'UNAUTHORIZED' }, 401)
+  }
 
   const { projectId: rawProjectId } = await params
   const parsedProjectId = parseProjectId(rawProjectId)
@@ -132,6 +141,14 @@ export async function POST(request: Request, { params }: RouteContext) {
     }
   }
 
+  log.info('ai.generation_started', {
+    projectId: parsedProjectId.data,
+    nodeId: input.nodeId,
+    provider: input.provider,
+    modelId: input.modelId,
+    expectedRevision: input.expectedRevision,
+  }, requestId)
+
   try {
     const generatedText = await adapter.generateStructuredEdit({
       apiKey: connection.apiKey,
@@ -152,6 +169,13 @@ export async function POST(request: Request, { params }: RouteContext) {
       canvas,
     })
     if (revision === null) return providerJson({ error: 'REVISION_CONFLICT' }, 409)
+    log.info('ai.generation_succeeded', {
+      projectId: project.id,
+      nodeId: input.nodeId,
+      provider: input.provider,
+      modelId: input.modelId,
+      revision,
+    }, requestId)
     return providerJson({
       job: { id: claim.jobId, status: 'succeeded' },
       project: { canvas, revision },
@@ -166,13 +190,21 @@ export async function POST(request: Request, { params }: RouteContext) {
           ? error.message
           : 'GENERATION_FAILED'
     const outcomeUnknown = error instanceof ProviderAdapterError && error.outcomeUnknown
+    log.warn('ai.generation_failed', {
+      projectId: project.id,
+      nodeId: input.nodeId,
+      provider: input.provider,
+      modelId: input.modelId,
+      code,
+      outcomeUnknown,
+    }, requestId)
     await finishGenerationJob({
       jobId: claim.jobId,
       userId: session.user.id,
       status: outcomeUnknown ? 'unknown' : 'failed',
       errorCode: code,
     }).catch(() => undefined)
-    if (error instanceof ProviderAdapterError) return providerFailure(error)
+    if (error instanceof ProviderAdapterError) return providerFailure(error, { provider: input.provider, operation: 'generation', requestId })
     return providerJson({ error: code }, code === 'AI_TARGET_NODE_NOT_FOUND' ? 404 : 502)
   }
 }

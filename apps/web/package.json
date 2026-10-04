@@ -8,7 +8,7 @@
     "start": "next start -p 3100",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/lib/project-input.test.ts src/lib/design-ir.test.ts src/lib/canvas-store.test.ts src/lib/project-preview.test.ts src/lib/provider-secrets.test.ts src/lib/gemini-provider.test.ts src/lib/ai-edit.test.ts src/lib/provider-input.test.ts src/lib/http-json.test.ts src/lib/provider-url.test.ts src/lib/chat-completions-provider.test.ts src/lib/anthropic-provider.test.ts src/lib/site-url.test.ts src/lib/provider-retry.test.ts src/lib/ai-recovery.test.ts src/lib/design-apply.test.ts src/lib/export-artifact.test.ts src/lib/storage/storage.test.ts",
+    "test": "tsx --test src/lib/project-input.test.ts src/lib/design-ir.test.ts src/lib/canvas-store.test.ts src/lib/project-preview.test.ts src/lib/provider-secrets.test.ts src/lib/gemini-provider.test.ts src/lib/ai-edit.test.ts src/lib/provider-input.test.ts src/lib/http-json.test.ts src/lib/provider-url.test.ts src/lib/chat-completions-provider.test.ts src/lib/anthropic-provider.test.ts src/lib/site-url.test.ts src/lib/provider-retry.test.ts src/lib/ai-recovery.test.ts src/lib/design-apply.test.ts src/lib/export-artifact.test.ts src/lib/storage/storage.test.ts src/lib/security-hardening.test.ts",
     "e2e:production": "tsx scripts/e2e/run-production-e2e.ts",
     "e2e:journeys": "tsx scripts/e2e/auth-projects.ts",
     "db:generate": "drizzle-kit generate",

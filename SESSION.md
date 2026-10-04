@@ -889,6 +889,21 @@ Local synthetic fixtures may validate schemas and queries but must never be repo
 | Blockers | Kredensial real untuk 11 provider non-Gemini belum tersedia (expected); `E2E_OPENAI_COMPATIBLE_*` opsional bila owner menyediakan; public deploy tetap menunggu DB production + domain + env final. |
 | Next action | Fresh production build + `pnpm e2e:production` (wajib Gemini bila `E2E_REQUIRE_GEMINI=true`); lalu scoped `appendChild`, timeout recovery, dan P0 lanjutan sesuai dependency order. |
 
+### 2026-09-27 — Phase A: security + observability hardening
+
+| Field | Evidence |
+|---|---|
+| Structured logging | New `observability/logger.ts` emits redacted JSON lines (timestamp, level, event, `requestId` correlation id, fields) for: provider request started/succeeded/failed, credential rejected, connection saved, AI generation started/succeeded/failed, storage upload prepared/failed, share created/revoked/resolved, export succeeded/failed, design-context applied, preset applied, auth rejected and security rejections. No parallel logging system was created; this is the single surface a future Sentry integration consumes. `LOG_LEVEL` configurable. |
+| Centralized redaction | New `observability/redact.ts` redacts by **key name** (`apiKey`, `secret`, `password`, `token`, `authorization`, `credential`, `cookie`, `signature`, `sessionId`, …) and by **value shape** (`AIza…`, `sk-…`, `gh*_…`, `xox*-…`, `AKIA…`, `postgres://user:pass@…`, `Bearer …`), truncates long strings, bounds array depth/size, and preserves error `code` plus non-secret context so failures stay diagnosable. |
+| Rate limiting | New `rate-limit.ts`: bounded fixed-window limiter for `share:create`, `share:revoke`, `export:generate`, `asset:prepare`, `design-context:apply`, `preset:apply`, returning 429 + `retryAfterSeconds`. Existing DB-backed provider validation and generation-job limits retained. Deliberately no new Redis dependency. |
+| Real bug found and fixed | `GET /api/projects/:id/preset` returned 200 for a **different owner**. The catalog is global, but the endpoint is project-scoped and therefore confirmed another owner's project existed. Now enforces ownership and returns 404. Caught by the new security E2E journey, not by review. |
+| Custom provider URL hardening (E2E) | Rejected before any outbound request: IP-literal host, plain `http://`, credentials embedded in the URL, duplicate `/v1/v1` path segments, and query strings. Legitimate `https://host.example/v1` forms remain accepted by the same normalizer used by the adapter. |
+| Share enumeration | Unknown, revoked and expired tokens are indistinguishable (all 404). Malformed/short/long/path-like tokens rejected by shape before any lookup. Raw token returned only at creation, only its SHA-256 hash persisted, only a non-secret 8-char prefix stored for owner identification. |
+| Storage abuse | Deletion is keyed by asset id and owner-scoped; arbitrary object keys are never accepted from users. Object keys are server-generated. No metadata row is written when storage acquisition fails. |
+| Tests | `typecheck` PASS, `lint` PASS, `pnpm --filter @forme/web test` **87/87** PASS (6 new: redaction by key/shape, nested + error handling, payload bounds, ordinary-text passthrough, rate-limit burst/recovery/per-identity/per-action scoping). |
+| Production E2E | PASS. New security journey asserts: foreign-origin credential write 403, simple content-type 415, unknown provider 422, Ignix rejected 422, five rejected custom Base URLs, cross-user access denial on preset/design-context/shares/export, cross-user generation 404, cross-user asset delete 404, and share-token enumeration resistance. |
+| Next action | Phase B — connect the verified backend to real UI surfaces. |
+
 ### 2026-09-27 — S3-compatible storage abstraction + asset persistence (P0 batch)
 
 | Field | Evidence |

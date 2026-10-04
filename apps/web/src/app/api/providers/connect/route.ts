@@ -5,16 +5,24 @@ import { assertProviderEncryptionConfigured } from '@/lib/provider-secrets'
 import { getProviderAdapter } from '@/lib/provider-adapters'
 import type { ProviderModel } from '@/lib/provider-types'
 import { persistProviderConnection, recordProviderValidationAttempt } from '@/lib/provider-service'
-import { providerFailure, providerJson } from '@/lib/provider-http'
+import { getRequestId, providerFailure, providerJson } from '@/lib/provider-http'
+import { log } from '@/lib/observability/logger'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
+  const requestId = await getRequestId()
   const invalidMutation = mutationFailureResponse(request)
-  if (invalidMutation) return invalidMutation
+  if (invalidMutation) {
+    log.warn('auth.security_rejection', { route: '/api/providers/connect', reason: invalidMutation.status }, requestId)
+    return invalidMutation
+  }
   const session = await getServerSession()
-  if (!session) return providerJson({ error: 'UNAUTHORIZED' }, 401)
+  if (!session) {
+    log.warn('auth.rejected', { route: '/api/providers/connect' }, requestId)
+    return providerJson({ error: 'UNAUTHORIZED' }, 401)
+  }
 
   const body = await readJsonBody(request)
   if (!body.ok) return providerJson({ error: body.status === 413 ? 'BODY_TOO_LARGE' : 'INVALID_JSON' }, body.status)
@@ -38,13 +46,14 @@ export async function POST(request: Request) {
   }
 
   let models: ProviderModel[]
+  log.info('provider.request_started', { provider: input.data.provider, operation: 'validate_credentials' }, requestId)
   try {
     models = await adapter.validateCredentials({
       apiKey: input.data.apiKey,
       configuration: { ...(input.data.baseUrl ? { baseUrl: input.data.baseUrl } : {}), ...(input.data.modelId ? { modelId: input.data.modelId } : {}) },
     })
   } catch (error) {
-    return providerFailure(error)
+    return providerFailure(error, { provider: input.data.provider, operation: 'validate_credentials', requestId })
   }
 
   try {
@@ -55,8 +64,14 @@ export async function POST(request: Request) {
       configuration: { ...(input.data.baseUrl ? { baseUrl: input.data.baseUrl } : {}), ...(input.data.modelId ? { modelId: input.data.modelId } : {}) },
       models,
     })
+    log.info('provider.connection_saved', {
+      provider: input.data.provider,
+      connectionId: connection.id,
+      modelCount: models.length,
+    }, requestId)
     return providerJson({ connection }, 201)
   } catch {
+    log.error('provider.request_failed', { provider: input.data.provider, operation: 'persist_connection' }, requestId)
     return providerJson({ error: 'PROVIDER_CONNECTION_SAVE_FAILED' }, 503)
   }
 }
