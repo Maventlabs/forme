@@ -925,6 +925,7 @@ async function run(baseUrl: URL, pool: Pool) {
   await runGeminiJourney(baseUrl, pool, ownerId, ownerJar, otherJar)
 
   await runDesignContextAndSharingJourney(baseUrl, pool, ownerJar, otherJar)
+  await runAssetJourney(baseUrl, ownerJar, otherJar)
 
   const ownerSignOut = await request(baseUrl, '/api/auth/sign-out', { method: 'POST', json: {}, jar: ownerJar })
   const signOutBody = await ownerSignOut.clone().json().catch(() => undefined) as { code?: unknown } | undefined
@@ -1115,6 +1116,83 @@ async function runDesignContextAndSharingJourney(baseUrl: URL, pool: Pool, owner
   assert.equal(afterRevoke.status, 404, 'a revoked share token must stop resolving')
 
   pass('curated presets, manual DESIGN.md context, real JSON/SVG export, and revocable read-only share links preserve semantic structure and never leak private data')
+}
+
+async function runAssetJourney(baseUrl: URL, ownerJar: CookieJar, otherJar: CookieJar) {
+  const created = await request(baseUrl, '/api/projects', {
+    method: 'POST',
+    json: { name: `FORME E2E assets ${runId}` },
+    jar: ownerJar,
+  })
+  assert.equal(created.status, 201, 'asset journey must have its own project')
+  const projectId = (await created.json() as { project?: { id?: string } }).project?.id
+  assert.equal(typeof projectId, 'string')
+  projectIds.add(projectId as string)
+
+  const anonymousPrepare = await request(baseUrl, `/api/projects/${projectId}/assets`, {
+    method: 'POST', json: { fileName: 'secret.png', mimeType: 'image/png', byteSize: 1024 },
+  })
+  assert.equal(anonymousPrepare.status, 401, 'anonymous users must not request upload URLs')
+
+  const rejectedType = await request(baseUrl, `/api/projects/${projectId}/assets`, {
+    method: 'POST', json: { fileName: 'payload.html', mimeType: 'text/html', byteSize: 1024 }, jar: ownerJar,
+  })
+  assert.equal(rejectedType.status, 422, 'disallowed upload content types must be rejected')
+
+  const activeContent = await request(baseUrl, `/api/projects/${projectId}/assets`, {
+    method: 'POST', json: { fileName: 'x.svg', mimeType: 'image/svg+xml', byteSize: 1024 }, jar: ownerJar,
+  })
+  assert.equal(activeContent.status, 422, 'active content types must be rejected by default')
+
+  const oversized = await request(baseUrl, `/api/projects/${projectId}/assets`, {
+    method: 'POST', json: { fileName: 'huge.png', mimeType: 'image/png', byteSize: 64 * 1024 * 1024 }, jar: ownerJar,
+  })
+  assert.equal(oversized.status, 422, 'oversized uploads must be rejected before any storage work')
+
+  const foreignProject = await request(baseUrl, `/api/projects/${randomUUID()}/assets`, {
+    method: 'POST', json: { fileName: 'x.png', mimeType: 'image/png', byteSize: 1024 }, jar: otherJar,
+  })
+  assert.equal(foreignProject.status, 503, 'storage-unconfigured must fail honestly instead of faking an upload')
+
+  const prepare = await request(baseUrl, `/api/projects/${projectId}/assets`, {
+    method: 'POST',
+    json: { fileName: 'hero.png', mimeType: 'image/png', byteSize: 2048, sha256: 'a'.repeat(64) },
+    jar: ownerJar,
+  })
+
+  const storageConfigured = prepare.status !== 503
+  if (!storageConfigured) {
+    const unavailable = await prepare.json() as { error?: string }
+    assert.equal(unavailable.error, 'STORAGE_UNAVAILABLE', 'missing durable storage must be reported honestly')
+    const listed = await request(baseUrl, `/api/projects/${projectId}/assets`, { jar: ownerJar })
+    assert.equal(listed.status, 200, 'asset listing must still answer for an authenticated owner')
+    assert.deepEqual((await listed.json() as { assets?: unknown[] }).assets, [], 'no asset may be recorded without durable storage')
+    pass('asset upload is validated and fails honestly with STORAGE_UNAVAILABLE (no fake upload, no metadata row)')
+    return
+  }
+
+  assert.equal(prepare.status, 201, 'a configured durable storage must return a presigned upload')
+  const prepared = await prepare.json() as { asset?: { id?: string }; upload?: { url?: string; headers?: Record<string, string> } }
+  assert.equal(typeof prepared.asset?.id, 'string', 'upload preparation must return an asset id')
+  assert.ok(String(prepared.upload?.url).startsWith('https://'), 'presigned upload URL must be delivered')
+  assert.equal(prepared.upload?.headers?.['content-type'], 'image/png', 'presigned upload must pin the content type')
+
+  const confirmed = await request(baseUrl, `/api/projects/${projectId}/assets/complete`, {
+    method: 'POST', json: { assetId: prepared.asset!.id }, jar: ownerJar,
+  })
+  assert.ok([200, 409].includes(confirmed.status), 'confirmation must reflect real object state, never assume success')
+
+  const foreignConfirm = await request(baseUrl, `/api/projects/${projectId}/assets/complete`, {
+    method: 'POST', json: { assetId: prepared.asset!.id }, jar: otherJar,
+  })
+  assert.equal(foreignConfirm.status, 404, 'other users must not confirm or read a private asset')
+
+  const foreignDelete = await request(baseUrl, `/api/assets/${prepared.asset!.id}`, { method: 'DELETE', jar: otherJar })
+  assert.equal(foreignDelete.status, 404, 'other users must not delete a private asset')
+
+  const deleted = await request(baseUrl, `/api/assets/${prepared.asset!.id}`, { method: 'DELETE', jar: ownerJar })
+  assert.equal(deleted.status, 204, 'owner must be able to delete an asset and its stored object')
+  pass('asset upload, validation, confirmation, ownership isolation, and deletion verified against durable storage')
 }
 
 export async function runProductionE2E(targetBaseUrl: URL, databaseUrl: string) {

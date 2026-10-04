@@ -162,4 +162,24 @@ export const shareLinks = pgTable('share_links', {
   index('share_links_project_created_at_idx').on(table.projectId, table.createdAt),
 ])
 
-export const schema = { user, session, account, verification, projects, providerConnections, modelCache, aiGenerationJobs, designContexts, shareLinks }
+export const assets = pgTable('assets', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  objectKey: text('object_key').notNull(),
+  fileName: text('file_name').notNull(),
+  mimeType: text('mime_type').notNull(),
+  byteSize: integer('byte_size').notNull(),
+  sha256: text('sha256').notNull(),
+  status: text('status').$type<'pending' | 'ready' | 'failed'>().default('pending').notNull(),
+  placeholderNote: text('placeholder_note'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => [
+  uniqueIndex('assets_object_key_unique').on(table.objectKey),
+  index('assets_project_created_at_idx').on(table.projectId, table.createdAt),
+  check('assets_status_check', sql`${table.status} in ('pending', 'ready', 'failed')`),
+  check('assets_byte_size_check', sql`${table.byteSize} >= 0`),
+])
+
+export const schema = { user, session, account, verification, projects, providerConnections, modelCache, aiGenerationJobs, designContexts, shareLinks, assets }

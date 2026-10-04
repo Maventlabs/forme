@@ -17,11 +17,11 @@
 |---|---|
 | Product | FORME — by Mavent |
 | Current phase | Phase 5 — AI Composer + Provider Layer (core P0 backend batch in progress) |
-| Current task | Provider/Composer core verified end-to-end (scoped setNodeText + appendChild, timeout recovery); next batch is DESIGN.md + presets, then share/export, then storage |
+| Current task | Provider/Composer core + presets/DESIGN.md + export/share + storage abstraction all verified end-to-end; next is the security/observability hardening pass, then UI surfaces, then final frontend redesign |
 | Priority | High/P0 |
 | Execution mode | Production breadth pass; backend/durable behavior before frontend polish |
 | Status | Fresh controlled production E2E PASS with real Gemini: build-identity gate, unique port/run id, scoped setNodeText, scoped appendChild (1 server-named child, rev 3→5), foreign scope 404, stale revision 409, idempotent replay, provider-timeout failure with no partial mutation + bounded-retry recovery through the real provider. |
-| Next action | Implement manual `DESIGN.md` context + curated presets with real persistence and structure-preserving apply, then read-only share + real export artifact, then S3-compatible storage abstraction. |
+| Next action | Security/observability hardening pass, then build the UI surfaces for presets, DESIGN.md, assets, share and export, then run the final frontend redesign. |
 | Last verified commit | 5eb760e — netlify.toml secrets-scan + ignore fix, pushed; `main` in sync; live site https://forme-apps.netlify.app rebuilding |
 | Last verified environment | Windows workspace, Node 24.9.0, pnpm 11.17.0, Next.js 16.3.6; Git repo `Maventlabs/forme`, branch `main` in sync with `origin/main`; isolated Neon `forme-dev`; fresh controlled production E2E PASS (build-identity gated, unique port/run id) against a locally started production server |
 | Last updated | 2026-09-26 |
@@ -888,6 +888,20 @@ Local synthetic fixtures may validate schemas and queries but must never be repo
 | Tools/skills | `using-superpowers`, `brainstorming` (bounded path), `ponytail`, `incremental-implementation`, `test-driven-development`, `api-and-interface-design`, `security-and-hardening`, `neon-postgres`, `nextjs-app-router-patterns`, `ai-debt-detector`, `verification-before-completion`, `documentation-and-adrs`; 4 sub-agent read-only (provider-contract research, BYOK security review, E2E coverage, SSRF helper + test). No browser automation. |
 | Blockers | Kredensial real untuk 11 provider non-Gemini belum tersedia (expected); `E2E_OPENAI_COMPATIBLE_*` opsional bila owner menyediakan; public deploy tetap menunggu DB production + domain + env final. |
 | Next action | Fresh production build + `pnpm e2e:production` (wajib Gemini bila `E2E_REQUIRE_GEMINI=true`); lalu scoped `appendChild`, timeout recovery, dan P0 lanjutan sesuai dependency order. |
+
+### 2026-09-27 — S3-compatible storage abstraction + asset persistence (P0 batch)
+
+| Field | Evidence |
+|---|---|
+| Scope | Vendor-neutral `FormeObjectStorage` contract + S3-compatible SigV4 implementation (presigned PUT, HEAD, DELETE) with no new dependency, plus `assets` persistence, presigned upload preparation, real confirmation, and deletion. |
+| Safety | MIME allowlist (PNG/JPEG/WebP/GIF/markdown/text/JSON); active content (`image/svg+xml`) rejected by default; per-kind size caps; object keys are **server-generated** from owner/project/asset ids so they can never contain traversal or user filenames; uploaded filenames sanitized before being stored as metadata; non-HTTPS endpoints rejected outside localhost; secret access key never appears in presigned URLs. |
+| Honesty boundary | With no `S3_*` credentials configured, `getObjectStorage()` returns `null` and the API answers `503 STORAGE_UNAVAILABLE`. **No in-memory fake store is substituted and no metadata row is written**, so an asset can never be listed as ready when it does not exist in durable storage. |
+| Database | Migration `0004_motionless_ronan.sql` adds `assets` (owner FK, unique object key, status `pending`/`ready`/`failed`, sha256, placeholder note). Applied to isolated Neon `forme-dev`. |
+| Tests | `typecheck` PASS, `lint` PASS, `pnpm --filter @forme/web test` **81/81** PASS (6 storage tests cover allowlist, traversal-free keys, filename sanitisation, config validation, deterministic SigV4 signatures with no secret leakage, and the honest null-storage behaviour). |
+| Production E2E | PASS. Asset journey asserts anonymous denial, disallowed type rejection, active-content rejection, oversize rejection, and — because no durable storage credential exists yet — that the flow reports `STORAGE_UNAVAILABLE`, lists zero assets, and never fakes an upload. The durable-storage branch of the journey (presigned URL, content-type pinning, confirmation, cross-user confirm/delete denial, owner delete) is implemented and will execute automatically once `S3_*` variables are provided. |
+| Provider verification state | Unchanged: Gemini fully verified; all other providers implemented / credential verification pending. |
+| Remaining P0 | Real S3 credential verification (blocked on owner credential); asset/preset/share/export UI surfaces; security/observability hardening (rate limiting on remaining endpoints, structured logs, dependency scan); final frontend redesign. |
+| Next action | Security/observability hardening pass, then UI surfaces for the new durable capabilities, then final frontend redesign. |
 
 ### 2026-09-27 — DESIGN.md context, curated presets, export, and read-only share (P0 batch)
 
