@@ -28,6 +28,7 @@ import { LogoutButton } from './logout-button'
 import { AIComposer } from './ai-composer'
 import { CanvasProvider, useCanvasStore, useCanvasStoreApi } from './canvas-provider'
 import { CanvasNodeView } from './canvas-node-view'
+import { ProjectControls } from './project-controls'
 import type { CanvasOperation, NodeChanges, SaveState } from './canvas-store'
 import shell from './workspace.module.css'
 import styles from './canvas.module.css'
@@ -519,8 +520,10 @@ function CanvasWorkspace({ projectId, projectName, name, email }: Omit<Parameter
           <div className={shell.identity}><span className={shell.avatar} aria-hidden="true">{(name || email).slice(0, 1).toUpperCase()}</span><div><strong>{name || 'FORME member'}</strong><span>{email}</span></div></div>
           <LogoutButton />
         </section>
-        <section className={shell.panelSection} aria-labelledby="share-title"><h2 id="share-title">Share</h2><p>Private to your account</p><span className={shell.coming}>Sharing arrives later</span></section>
-        <section className={shell.panelSection} aria-labelledby="export-title"><h2 id="export-title">Export</h2><p>Current canvas saved</p><span className={shell.coming}>Export arrives later</span></section>
+        <section className={shell.panelSection} aria-labelledby="project-controls-title">
+          <h2 id="project-controls-title">Presets, design context, assets, share, export</h2>
+          <ProjectControls projectId={projectId} revision={revision} />
+        </section>
         <section className={`${shell.panelSection} ${shell.inspectorSection}`} aria-labelledby="inspector-title">
           <h2 id="inspector-title">Inspector</h2>
           {selectedNode ? (

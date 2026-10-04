@@ -832,6 +832,13 @@ async function run(baseUrl: URL, pool: Pool) {
   assert.match(workspaceHtml, /Bring your own model/, 'Composer must expose the canonical BYOK provider connection surface')
   assert.match(workspaceHtml, /Provider/, 'Composer must render the provider selector label')
   assert.match(workspaceHtml, /Inspector/, 'workspace response must render the node inspector')
+  assert.match(workspaceHtml, /Presets, design context, assets, share, export/, 'workspace must expose the real project controls')
+  assert.ok(!workspaceHtml.includes('Sharing arrives later'), 'workspace must not ship a dead share placeholder')
+  assert.ok(!workspaceHtml.includes('Export arrives later'), 'workspace must not ship a dead export placeholder')
+  assert.match(workspaceHtml, /Parse and apply/, 'workspace must expose the real DESIGN.md workflow')
+  assert.match(workspaceHtml, /Create read-only link/, 'workspace must expose real share creation')
+  assert.match(workspaceHtml, /Design IR JSON/, 'workspace must expose real export')
+  assert.match(workspaceHtml, /Object storage is not configured yet|Upload/, 'workspace must expose the asset workflow')
   assert.match(workspaceHtml, /Layers/, 'workspace response must render the layer list')
   assert.match(workspaceHtml, /Section templates/, 'workspace response must render the section block catalog')
   assert.match(workspaceHtml, /Page title/, 'workspace response must render the persisted semantic node')
@@ -1115,7 +1122,29 @@ async function runDesignContextAndSharingJourney(baseUrl: URL, pool: Pool, owner
   const afterRevoke = await request(baseUrl, `/api/share/${shareToken}`)
   assert.equal(afterRevoke.status, 404, 'a revoked share token must stop resolving')
 
+  const sharePage = await request(baseUrl, `/share/${shareToken}`)
+  assert.ok([404, 410].includes(sharePage.status), 'a revoked share page must not render the canvas')
+
+  const bogusSharePage = await request(baseUrl, '/share/not-a-real-share-token-value')
+  assert.ok([404, 410].includes(bogusSharePage.status), 'an unknown share page must not render')
+
   pass('curated presets, manual DESIGN.md context, real JSON/SVG export, and revocable read-only share links preserve semantic structure and never leak private data')
+
+  // The public share page must render a real read-only artifact while active.
+  const activeShare = await request(baseUrl, `/api/projects/${projectId}/shares`, {
+    method: 'POST', json: { expiresInDays: 1 }, jar: ownerJar,
+  })
+  assert.equal(activeShare.status, 201, 'a second share link must be creatable for page verification')
+  const activeToken = (await activeShare.json() as { share?: { token?: string } }).share?.token
+  assert.equal(typeof activeToken, 'string')
+
+  const activeSharePage = await request(baseUrl, `/share/${activeToken}`)
+  assert.equal(activeSharePage.status, 200, 'an active share link must render its public read-only page')
+  const sharePageHtml = await activeSharePage.text()
+  assert.match(sharePageHtml, /Read-only share/, 'the shared page must state that it is read-only')
+  assert.ok(sharePageHtml.includes(`data-node-id="${containerNodeId}"`), 'the shared page must render the real wireframe')
+  assert.ok(!sharePageHtml.includes(ownerJar.header), 'the shared page must never expose session cookies')
+  pass('public share page renders the real read-only artifact and leaks no session data')
 }
 
 async function runAssetJourney(baseUrl: URL, ownerJar: CookieJar, otherJar: CookieJar) {
