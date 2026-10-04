@@ -7,10 +7,10 @@ import { parseCanvasDocument, type DesignNode } from '@forme/design-ir'
 import type { SaveState } from './canvas-store'
 import { ProviderConnections } from './provider-connections'
 import { useProviderConnections } from './use-provider-connections'
+import { isAIContainerNodeType, isAIEditableNodeType } from '@/lib/ai-scope'
 import type { ProviderId } from '@/lib/provider-types'
 import styles from './ai-composer.module.css'
 
-const editableTypes = new Set(['heading', 'text', 'paragraph', 'button'])
 
 export function AIComposer({
   projectId,
@@ -41,7 +41,15 @@ export function AIComposer({
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
   const [lastIdempotencyKey, setLastIdempotencyKey] = useState('')
-  const canEditTarget = selectedNode !== null && editableTypes.has(selectedNode.type)
+  const canEditTarget = selectedNode !== null
+    && (isAIEditableNodeType(selectedNode.type) || isAIContainerNodeType(selectedNode.type))
+  const targetHint = selectedNode === null
+    ? 'Select a text-capable node or a container to scope an edit.'
+    : isAIContainerNodeType(selectedNode.type)
+      ? 'Ask to add or rewrite content inside this container.'
+      : isAIEditableNodeType(selectedNode.type)
+        ? 'Describe a change to this node…'
+        : 'Select a heading, text, paragraph, button, or container…'
   const canSend = canEditTarget && selectedProvider !== '' && models.some((model) => model.id === selectedModel) && instruction.trim().length > 0
     && !busy && !compareMode && saveState === 'saved' && !pending && !generationUncertain
   const canCheckStatus = lastIdempotencyKey.length > 0
@@ -173,13 +181,13 @@ export function AIComposer({
       </div>
       <form className={styles.composerForm} onSubmit={sendInstruction}>
         <p className={styles.scope}>
-          {canEditTarget ? `@node · ${selectedNode.label}` : 'Select a text-capable node to scope an edit.'}
+          {canEditTarget ? `@node · ${selectedNode.label}` : 'Select a text-capable node or a container to scope an edit.'}
         </p>
         <textarea
           aria-label="Instructions for the selected node"
           maxLength={1_000}
           onChange={(event) => setInstruction(event.target.value)}
-          placeholder={canEditTarget ? 'Describe a change to this node…' : 'Select a heading, text, paragraph, or button…'}
+          placeholder={targetHint}
           value={instruction}
         />
         <div className={styles.composerFooter}>

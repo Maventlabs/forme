@@ -3,7 +3,7 @@ import { readJsonBody } from '@/lib/http-json'
 import { scopedGenerationInputSchema } from '@/lib/provider-input'
 import { getServerSession } from '@/lib/server-session'
 import { getOwnedProjectCanvas } from '@/lib/canvas-persistence'
-import { applyScopedAIEdit, isAIEditableNodeType, parseAIEditOperations } from '@/lib/ai-edit'
+import { applyScopedAIEdit, isAIScopedEditTarget, parseAIEditOperations } from '@/lib/ai-edit'
 import { fingerprintProviderRequest, providerRequestFingerprintMatches } from '@/lib/provider-secrets'
 import { ProviderAdapterError } from '@/lib/provider-types'
 import { getProviderAdapter } from '@/lib/provider-adapters'
@@ -88,7 +88,7 @@ export async function POST(request: Request, { params }: RouteContext) {
 
   const node = project.canvas.nodes[input.nodeId]
   if (!node) return providerJson({ error: 'AI_TARGET_NODE_NOT_FOUND' }, 404)
-  if (!isAIEditableNodeType(node.type)) return providerJson({ error: 'AI_TARGET_NODE_NOT_TEXT_EDITABLE' }, 422)
+  if (!isAIScopedEditTarget(node)) return providerJson({ error: 'AI_TARGET_NODE_NOT_EDITABLE' }, 422)
 
   let connection
   try {

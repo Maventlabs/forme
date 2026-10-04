@@ -16,14 +16,14 @@
 | Field | Value |
 |---|---|
 | Product | FORME — by Mavent |
-| Current phase | Phase 5 — AI Composer + Provider Layer |
-| Current task | Canonical BYOK layer implemented for all 12 PRD provider IDs + OpenAI-Compatible; scoped generation open to all adapters; next is scoped create + timeout-recovery E2E |
+| Current phase | Phase 5 — AI Composer + Provider Layer (core P0 backend batch in progress) |
+| Current task | Provider/Composer core verified end-to-end (scoped setNodeText + appendChild, timeout recovery); next batch is DESIGN.md + presets, then share/export, then storage |
 | Priority | High/P0 |
 | Execution mode | Production breadth pass; backend/durable behavior before frontend polish |
-| Status | Provider batch implemented + verified by unit/contract tests, typecheck, lint, production build. Gemini keeps prior real-provider E2E evidence; other adapters are implemented / credential verification pending (no fake PASS). README + netlify.toml + gitignore added. No deployment run; no secrets exposed. |
-| Next action | Run full `pnpm e2e:production` (Gemini + OpenAI-Compatible env bila tersedia) on a fresh controlled build, then implement scoped `appendChild` + timeout recovery. |
+| Status | Fresh controlled production E2E PASS with real Gemini: build-identity gate, unique port/run id, scoped setNodeText, scoped appendChild (1 server-named child, rev 3→5), foreign scope 404, stale revision 409, idempotent replay, provider-timeout failure with no partial mutation + bounded-retry recovery through the real provider. |
+| Next action | Implement manual `DESIGN.md` context + curated presets with real persistence and structure-preserving apply, then read-only share + real export artifact, then S3-compatible storage abstraction. |
 | Last verified commit | 5eb760e — netlify.toml secrets-scan + ignore fix, pushed; `main` in sync; live site https://forme-apps.netlify.app rebuilding |
-| Last verified environment | Windows workspace, Node 24.9.0, pnpm 11.17.0, Next.js 16.3.6; isolated Neon `forme-dev`; latest `pnpm e2e:production` passed against a fresh local production build at `localhost:3101` with temporary auth-origin override; no Git repository |
+| Last verified environment | Windows workspace, Node 24.9.0, pnpm 11.17.0, Next.js 16.3.6; Git repo `Maventlabs/forme`, branch `main` in sync with `origin/main`; isolated Neon `forme-dev`; fresh controlled production E2E PASS (build-identity gated, unique port/run id) against a locally started production server |
 | Last updated | 2026-09-26 |
 
 > **Mandatory Pre-P0 override:** before executing the current Phase 1 visual task, complete the `Brand Asset Preparation Gate` below. Phase 1 may continue immediately after the logo extraction ledger is verified. This override does not erase the existing Phase 1 plan; it inserts a required asset-preflight step in front of it.
@@ -888,6 +888,20 @@ Local synthetic fixtures may validate schemas and queries but must never be repo
 | Tools/skills | `using-superpowers`, `brainstorming` (bounded path), `ponytail`, `incremental-implementation`, `test-driven-development`, `api-and-interface-design`, `security-and-hardening`, `neon-postgres`, `nextjs-app-router-patterns`, `ai-debt-detector`, `verification-before-completion`, `documentation-and-adrs`; 4 sub-agent read-only (provider-contract research, BYOK security review, E2E coverage, SSRF helper + test). No browser automation. |
 | Blockers | Kredensial real untuk 11 provider non-Gemini belum tersedia (expected); `E2E_OPENAI_COMPATIBLE_*` opsional bila owner menyediakan; public deploy tetap menunggu DB production + domain + env final. |
 | Next action | Fresh production build + `pnpm e2e:production` (wajib Gemini bila `E2E_REQUIRE_GEMINI=true`); lalu scoped `appendChild`, timeout recovery, dan P0 lanjutan sesuai dependency order. |
+
+### 2026-09-27 — Git reconciliation + controlled E2E + scoped appendChild + timeout recovery
+
+| Field | Evidence |
+|---|---|
+| Reconciliation | Repository IS a Git repository with `origin/main`; current state row corrected (previously "no Git repository"). Historical ledger lines describing the pre-2026-09-27 state are retained as history, not current state. `main` == `origin/main` at this batch's start. |
+| Stale-build fix (real bug) | `pnpm e2e:production` used to accept any `E2E_BASE_URL`, which previously caused a stale-server false failure. New orchestrator `scripts/e2e/run-production-e2e.ts`: fresh `next build` → read `.next/BUILD_ID` → start `next start` on a unique free port with a unique run id → poll new `/api/health` → assert served build id matches the fresh build → run journeys → always shut down. Mismatch fails loudly. Journeys no longer auto-run on import (duplicate-run bug fixed). |
+| Scoped `appendChild` | Allowlisted op added beside `setNodeText` (`ai-edit.ts`). Server binds the parent to the selected node and generates the child id server-side, so the model can never target/name nodes. Uses Design IR `insertNode`, which enforces `acceptsChildren` and appends deterministically. Persisted through the existing optimistic-revision transaction. Client-safe scope predicates extracted to `ai-scope.ts` (keeps `node:crypto` out of the browser bundle). Unit/contract coverage: valid append, invalid parent, foreign/out-of-scope target, malformed op, unknown block id, ordering, no-mutation-on-failure. |
+| Timeout recovery | New `provider-retry.ts`: bounded retry (max 3 attempts, capped exponential backoff + jitter) that retries ONLY `PROVIDER_TIMEOUT`/`PROVIDER_UNAVAILABLE`; credential, rate-limit, model-not-found, request-rejected and schema errors are terminal and never retried. Wired into Gemini generation. Mutation still happens only after a validated operation, so a failed call cannot half-apply. |
+| Production E2E | PASS via `pnpm e2e:production` with `E2E_REQUIRE_GEMINI=true`: signup/session, invalid-login recovery, hub + Coming Soon boundaries, nested nodes/custom blocks/revision retry, cross-account isolation, subtree deletion, Gemini invalid-credential rejection, encrypted credential at rest (44 live models), scoped setNodeText with read-back, scoped `appendChild` (exactly one child, revision 3→5, foreign scope 404, stale revision 409, idempotent replay, Neon read-back), provider timeout → `PROVIDER_TIMEOUT` 504 with **no canvas mutation** and a recoverable job row, then a bounded retry that **actually succeeds through the real provider**, disconnect/cache cleanup, sign-out, full cleanup. |
+| Honest fault-injection boundary | Timeout evidence uses a deterministic, env-gated fault (`FORME_E2E_PROVIDER_FAULTS`, only set by the orchestrator when real-provider verification is requested). The injected fault fails an attempt; the retry performs a **real** Gemini call. No provider success is ever faked. Production deployments cannot enable it. |
+| Tests | `typecheck` PASS, `lint` PASS, `pnpm --filter @forme/web test` 64/64 PASS. |
+| Provider verification state | Google Gemini: implemented + credential verified + live model discovery verified + real generation verified. OpenAI, Anthropic/Claude, Meta/Muse, Alibaba Qwen, Z.ai GLM, Xiaomi MiMo, xAI Grok, Moonshot Kimi, DeepSeek, MiniMax, OpenAI-Compatible: implemented / credential verification pending (no credential available; never claimed as PASS). Ignix: Coming Soon. |
+| Next action | Manual `DESIGN.md` context + curated presets (real persistence, structure-preserving apply), then read-only share + real export artifact, then S3-compatible storage abstraction. |
 
 ### 2026-09-27 — Netlify secrets-scan + ignore fix (via netlify.toml)
 

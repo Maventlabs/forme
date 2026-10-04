@@ -171,8 +171,11 @@ async function runGeminiJourney(baseUrl: URL, pool: Pool, ownerId: string, owner
   )
   const encryptedSecret = encryptedRow.rows[0]?.encrypted_secret
   assert.ok(typeof encryptedSecret === 'string' && encryptedSecret.length > 0, 'connection must persist encrypted credential material')
-  assert.ok(encryptedSecret !== apiKey, 'database must not store the plaintext provider key')
-  assert.ok(decryptProviderSecret(encryptedSecret, { ownerId, provider: 'google-gemini' }) === apiKey, 'server keyring must decrypt the saved credential for provider calls')
+  assert.ok(!encryptedSecret.includes(apiKey), 'database must not store the plaintext provider key')
+  // The envelope carries a versioned credential payload so provider config
+  // (Base URL / manual Model ID) can be encrypted together with the secret.
+  const decryptedPayload = JSON.parse(decryptProviderSecret(encryptedSecret, { ownerId, provider: 'google-gemini' })) as { v?: number; apiKey?: string }
+  assert.equal(decryptedPayload.apiKey, apiKey, 'server keyring must decrypt the saved credential for provider calls')
   const initialCache = await pool.query<{ count: number }>(
     'SELECT count(*)::int AS count FROM model_cache WHERE connection_id = $1::uuid',
     [connected.connection!.id],
@@ -315,6 +318,179 @@ async function runGeminiJourney(baseUrl: URL, pool: Pool, ownerId: string, owner
   })
   assert.equal(deniedGeneration.status, 404, 'other users must not generate against a private project')
   pass('real Gemini model discovery, encrypted connection, scoped edit, idempotent recovery, Neon read-back, and owner isolation')
+
+  // ---- scoped appendChild under a selected container ----
+  const containerNodeId = randomUUID()
+  const containerCreate = await request(baseUrl, '/api/nodes', {
+    method: 'POST',
+    json: { projectId, expectedRevision: 3, id: containerNodeId, blockId: 'container', label: 'Feature group' },
+    jar: ownerJar,
+  })
+  assert.equal(containerCreate.status, 201, 'container node must be created before scoped appendChild')
+
+  const foreignScope = await request(baseUrl, `/api/projects/${projectId}/generate`, {
+    method: 'POST',
+    json: {
+      nodeId: randomUUID(),
+      expectedRevision: 4,
+      idempotencyKey: randomUUID(),
+      provider: 'google-gemini',
+      modelId: selectedModel!.id,
+      instruction: 'Add a heading inside this node.',
+    },
+    jar: ownerJar,
+    timeoutMs: 45_000,
+  })
+  assert.equal(foreignScope.status, 404, 'generation must reject a node id outside the authorized project scope')
+
+  const staleRevision = await request(baseUrl, `/api/projects/${projectId}/generate`, {
+    method: 'POST',
+    json: {
+      nodeId: containerNodeId,
+      expectedRevision: 1,
+      idempotencyKey: randomUUID(),
+      provider: 'google-gemini',
+      modelId: selectedModel!.id,
+      instruction: 'Add a heading inside this container.',
+    },
+    jar: ownerJar,
+    timeoutMs: 45_000,
+  })
+  assert.equal(staleRevision.status, 409, 'appendChild must fail on a stale canvas revision without mutating state')
+
+  const appendInput = {
+    nodeId: containerNodeId,
+    expectedRevision: 4,
+    idempotencyKey: randomUUID(),
+    provider: 'google-gemini',
+    modelId: selectedModel!.id,
+    instruction: 'Add one heading child inside this container. Keep it short and return only the structured operation.',
+  }
+  const appended = await request(baseUrl, `/api/projects/${projectId}/generate`, {
+    method: 'POST',
+    json: appendInput,
+    jar: ownerJar,
+    timeoutMs: 60_000,
+  })
+  const appendedResult = await appended.json() as {
+    error?: unknown
+    job?: { status?: unknown }
+    project?: { canvas?: CanvasDocument; revision?: number }
+  }
+  assert.equal(
+    appended.status,
+    200,
+    `scoped appendChild must persist (HTTP ${appended.status}; code ${typeof appendedResult.error === 'string' ? appendedResult.error : 'unknown'}; live model ${selectedModel!.id})`,
+  )
+  assert.equal(appendedResult.job?.status, 'succeeded', 'appendChild generation job must succeed')
+  assert.equal(appendedResult.project?.revision, 5, 'appendChild must advance the canonical revision exactly once')
+
+  const containerAfter = appendedResult.project?.canvas?.nodes?.[containerNodeId]
+  assert.equal(containerAfter?.children.length, 1, 'appendChild must add exactly one child to the selected container')
+  const appendedChildId = containerAfter!.children[0]!
+  const appendedChild = appendedResult.project?.canvas?.nodes?.[appendedChildId]
+  assert.ok(appendedChild, 'appended child must be persisted in the canonical canvas')
+  assert.equal(appendedChild.parentId, containerNodeId, 'appended child must be parented to the server-selected container')
+  assert.equal(appendedResult.project?.canvas?.nodes?.[sentinelNodeId]?.props.text, 'Do not change this note', 'appendChild must not change unrelated nodes')
+  assert.deepEqual(appendedResult.project?.canvas?.rootIds, [targetNodeId, sentinelNodeId, containerNodeId], 'appendChild must not add or reorder root nodes')
+
+  const replayAppend = await request(baseUrl, `/api/projects/${projectId}/generate`, {
+    method: 'POST',
+    json: appendInput,
+    jar: ownerJar,
+    timeoutMs: 20_000,
+  })
+  const replayAppendResult = await replayAppend.json() as { job?: { replayed?: unknown }; project?: { revision?: unknown } }
+  assert.equal(replayAppend.status, 200, 'replaying the appendChild intent must recover without a second model call')
+  assert.equal(replayAppendResult.job?.replayed, true, 'appendChild replay must be served from the recorded job')
+  assert.equal(replayAppendResult.project?.revision, 5, 'appendChild replay must not add a second child or advance the revision')
+
+  const appendReadBack = await request(baseUrl, `/api/projects/${projectId}`, { jar: ownerJar })
+  const appendProject = await appendReadBack.json() as { project?: { canvas?: CanvasDocument; revision?: number } }
+  assert.equal(appendProject.project?.revision, 5, 'appendChild must survive a fresh Neon read-back')
+  assert.equal(appendProject.project?.canvas?.nodes?.[containerNodeId]?.children.length, 1, 'fresh read-back must contain exactly one appended child')
+  assert.ok(
+    appendedChildId !== undefined && appendProject.project?.canvas?.nodes?.[appendedChildId],
+    'fresh read-back must resolve the appended child node',
+  )
+  pass('scoped appendChild persists one server-named child, rejects stale revision and foreign scope, and replays idempotently')
+
+  // ---- provider timeout: failure state, no partial mutation, safe retry ----
+  const timeoutProject = await request(baseUrl, '/api/projects', {
+    method: 'POST',
+    json: { name: `FORME E2E timeout ${runId}` },
+    jar: ownerJar,
+  })
+  const timeoutProjectId = (await timeoutProject.json() as { project?: { id?: string } }).project?.id
+  assert.equal(typeof timeoutProjectId, 'string', 'timeout journey must have its own project')
+  projectIds.add(timeoutProjectId as string)
+  const timeoutNodeId = randomUUID()
+  const timeoutNodeCreate = await request(baseUrl, '/api/nodes', {
+    method: 'POST',
+    json: { projectId: timeoutProjectId, expectedRevision: 0, id: timeoutNodeId, blockId: 'heading', label: 'Timeout target', props: { text: 'Unchanged by failure' } },
+    jar: ownerJar,
+  })
+  assert.equal(timeoutNodeCreate.status, 201, 'timeout journey must seed a target node')
+
+  const timeoutInput = {
+    nodeId: timeoutNodeId,
+    expectedRevision: 1,
+    idempotencyKey: randomUUID(),
+    provider: 'google-gemini',
+    modelId: selectedModel!.id,
+    instruction: 'Rewrite this heading. FORME_E2E_INJECT_TIMEOUT_ALWAYS',
+  }
+  const timedOut = await request(baseUrl, `/api/projects/${timeoutProjectId}/generate`, {
+    method: 'POST',
+    json: timeoutInput,
+    jar: ownerJar,
+    timeoutMs: 60_000,
+  })
+  const timedOutResult = await timedOut.json() as { error?: unknown; job?: { status?: unknown } }
+  assert.equal(timedOutResult.error, 'PROVIDER_TIMEOUT', 'a persistent provider timeout must surface a real timeout error')
+  assert.equal(timedOut.status, 504, 'timeout must map to HTTP 504')
+
+  const timeoutJob = await request(baseUrl, `/api/generation/${timeoutInput.idempotencyKey}`, { jar: ownerJar })
+  const timeoutJobResult = await timeoutJob.json() as { job?: { status?: unknown; errorCode?: unknown } }
+  assert.ok(
+    timeoutJobResult.job?.status === 'unknown' || timeoutJobResult.job?.status === 'failed',
+    `timeout job must reach a terminal recoverable state (got ${String(timeoutJobResult.job?.status)})`,
+  )
+
+  const afterTimeout = await request(baseUrl, `/api/projects/${timeoutProjectId}`, { jar: ownerJar })
+  const afterTimeoutProject = await afterTimeout.json() as { project?: { canvas?: CanvasDocument; revision?: number } }
+  assert.equal(afterTimeoutProject.project?.revision, 1, 'a failed generation must not advance the canvas revision')
+  assert.equal(afterTimeoutProject.project?.canvas?.nodes?.[timeoutNodeId]?.props.text, 'Unchanged by failure', 'a failed generation must not partially mutate the canvas')
+  const timeoutJobRows = await pool.query<{ status: string }>(
+    'SELECT status FROM ai_generation_jobs WHERE user_id = $1 AND project_id = $2::uuid',
+    [ownerId, timeoutProjectId],
+  )
+  assert.equal(timeoutJobRows.rowCount, 1, 'exactly one job row must exist for the failed generation')
+  assert.notEqual(timeoutJobRows.rows[0]?.status, 'succeeded', 'a timed-out generation must never be recorded as succeeded')
+
+  const retried = await request(baseUrl, `/api/projects/${timeoutProjectId}/generate`, {
+    method: 'POST',
+    json: { ...timeoutInput, instruction: 'Rewrite this heading. FORME_E2E_INJECT_TIMEOUT_ONCE', idempotencyKey: randomUUID() },
+    jar: ownerJar,
+    timeoutMs: 60_000,
+  })
+  const retriedResult = await retried.json() as {
+    error?: unknown
+    job?: { status?: unknown }
+    project?: { canvas?: CanvasDocument; revision?: number }
+  }
+  assert.equal(
+    retried.status,
+    200,
+    `retry after a transient timeout must recover through the real provider (HTTP ${retried.status}; code ${typeof retriedResult.error === 'string' ? retriedResult.error : 'unknown'})`,
+  )
+  assert.equal(retriedResult.job?.status, 'succeeded', 'the retried generation must succeed')
+  assert.equal(retriedResult.project?.revision, 2, 'a successful retry advances the revision exactly once')
+  assert.ok(
+    retriedResult.project?.canvas?.nodes?.[timeoutNodeId]?.props.text !== 'Unchanged by failure',
+    'the successful retry must actually apply the scoped edit',
+  )
+  pass('provider timeout fails safely without mutation, records a recoverable job, and a bounded retry recovers through the real provider')
 
   const disconnect = await request(baseUrl, '/api/providers/google-gemini', { method: 'DELETE', jar: ownerJar })
   assert.equal(disconnect.status, 204, 'owner must be able to remove the provider connection')
@@ -653,7 +829,8 @@ async function run(baseUrl: URL, pool: Pool) {
   assert.match(workspaceHtml, /Select/, 'workspace response must render the canvas selection tool')
   assert.match(workspaceHtml, /Text/, 'workspace response must render the canvas text tool')
   assert.match(workspaceHtml, /AI Composer/, 'workspace response must render the real scoped Composer surface')
-  assert.match(workspaceHtml, /Google Gemini/, 'Composer must expose the first supported provider connection surface')
+  assert.match(workspaceHtml, /Bring your own model/, 'Composer must expose the canonical BYOK provider connection surface')
+  assert.match(workspaceHtml, /Provider/, 'Composer must render the provider selector label')
   assert.match(workspaceHtml, /Inspector/, 'workspace response must render the node inspector')
   assert.match(workspaceHtml, /Layers/, 'workspace response must render the layer list')
   assert.match(workspaceHtml, /Section templates/, 'workspace response must render the section block catalog')
@@ -764,15 +941,12 @@ async function run(baseUrl: URL, pool: Pool) {
   pass('sign-out and unauthenticated access denial')
 }
 
-async function main() {
-  assert.ok(Number.isInteger(timeoutMs) && timeoutMs >= 1_000 && timeoutMs <= 60_000, 'E2E_TIMEOUT_MS must be 1000–60000')
-  const baseUrl = resolveBaseUrl()
-  const databaseUrl = process.env.E2E_DATABASE_URL ?? requiredEnvironment('DATABASE_URL')
+export async function runProductionE2E(targetBaseUrl: URL, databaseUrl: string) {
   const pool = new Pool({ connectionString: databaseUrl, max: 2, connectionTimeoutMillis: timeoutMs })
 
   try {
     await pool.query('SELECT 1')
-    await run(baseUrl, pool)
+    await run(targetBaseUrl, pool)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown failure'
     process.stderr.write(`FAIL | production auth/project E2E: ${message}\n`)
@@ -803,7 +977,19 @@ async function main() {
   }
 }
 
-main().catch(() => {
-  process.stderr.write('FAIL | E2E configuration or setup error (check required E2E environment variables)\n')
-  process.exitCode = 1
-})
+async function main() {
+  assert.ok(Number.isInteger(timeoutMs) && timeoutMs >= 1_000 && timeoutMs <= 60_000, 'E2E_TIMEOUT_MS must be 1000–60000')
+  const baseUrl = resolveBaseUrl()
+  const databaseUrl = process.env.E2E_DATABASE_URL ?? requiredEnvironment('DATABASE_URL')
+  await runProductionE2E(baseUrl, databaseUrl)
+}
+
+// Only auto-run when executed directly. The orchestrator imports this module
+// and calls `runProductionE2E` itself, so a blind auto-run would launch a
+// second, duplicated journey against a possibly stale base URL.
+if (process.env.FORME_E2E_NO_AUTORUN !== '1') {
+  main().catch(() => {
+    process.stderr.write('FAIL | E2E configuration or setup error (check required E2E environment variables)\n')
+    process.exitCode = 1
+  })
+}
