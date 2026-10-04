@@ -511,6 +511,10 @@ async function run(baseUrl: URL, pool: Pool) {
   const anonymousProjects = await request(baseUrl, '/api/projects')
   assert.equal(anonymousProjects.status, 401, 'anonymous users must not list private projects')
 
+  const anonymousWorkspaceGate = await request(baseUrl, '/workspace')
+  assert.ok([307, 308].includes(anonymousWorkspaceGate.status), 'the workspace must require authentication before it renders')
+  assert.match(anonymousWorkspaceGate.headers.get('location') ?? '', /\/login/, 'the workspace must send anonymous visitors to sign in')
+
   const ownerSignupJar = new CookieJar()
   const ownerId = await createAccount(baseUrl, emails[0], 'FORME E2E Owner', ownerSignupJar)
   const signupSession = await request(baseUrl, '/api/auth/get-session', { jar: ownerSignupJar })
@@ -941,7 +945,7 @@ async function run(baseUrl: URL, pool: Pool) {
   assert.equal(signedOutProjects.status, 401, 'signed-out session must lose project access')
   const anonymousWorkspace = await request(baseUrl, `/workspace/${projectId}`)
   assert.ok([307, 308].includes(anonymousWorkspace.status), 'anonymous workspace request must redirect to sign-in')
-  for (const path of ['/projects', '/generator', '/cloning']) {
+  for (const path of ['/projects', '/generator', '/cloning', '/workspace']) {
     const response = await request(baseUrl, path)
     assert.ok([307, 308].includes(response.status), `${path} must remain protected after sign-out`)
   }

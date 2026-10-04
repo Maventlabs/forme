@@ -1,10 +1,23 @@
-import { MarketingNav } from '../marketing-nav'
-import { SiteFooter } from '../landing-sections'
+import { redirect } from 'next/navigation'
+import { getServerSession } from '@/lib/server-session'
 import { WorkspacePreview } from '../workspace-preview'
 import styles from './workspace-page.module.css'
 
-export const metadata = { title: 'Workspace preview — FORME by Mavent' }
+export const metadata = { title: 'Workspace — FORME by Mavent' }
+export const dynamic = 'force-dynamic'
 
-export default function WorkspacePage() {
-  return <><MarketingNav /><main className={styles.main}><h1>Explore the workspace preview.</h1><p>Select Heading or Media, switch breakpoint, or add a text block. This is a local temporary demonstration; projects, AI editing and cloud saving will open with the real editor.</p><div className={styles.stage}><WorkspacePreview interactive /></div><p className={styles.note}>Preview changes reset when the page reloads. The production workspace is still in development.</p></main><SiteFooter /></>
+// The workspace is an authenticated surface. Anonymous visitors are sent to
+// sign in first, exactly like every other private project route.
+export default async function WorkspacePage() {
+  const session = await getServerSession()
+  if (!session) redirect('/login?next=/workspace')
+
+  return (
+    <main className={styles.main}>
+      <h1>Workspace preview</h1>
+      <p>Select Heading or Media, switch breakpoint, or add a text block. Changes on this page are temporary and reset when it reloads.</p>
+      <div className={styles.stage}><WorkspacePreview interactive /></div>
+      <p className={styles.note}>Your own saved projects live in the project hub.</p>
+    </main>
+  )
 }

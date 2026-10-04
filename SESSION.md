@@ -889,6 +889,19 @@ Local synthetic fixtures may validate schemas and queries but must never be repo
 | Blockers | Kredensial real untuk 11 provider non-Gemini belum tersedia (expected); `E2E_OPENAI_COMPATIBLE_*` opsional bila owner menyediakan; public deploy tetap menunggu DB production + domain + env final. |
 | Next action | Fresh production build + `pnpm e2e:production` (wajib Gemini bila `E2E_REQUIRE_GEMINI=true`); lalu scoped `appendChild`, timeout recovery, dan P0 lanjutan sesuai dependency order. |
 
+### 2026-09-27 — Phase E (start): workspace gate + auth + navigation redesign
+
+| Field | Evidence |
+|---|---|
+| Workspace now requires sign-in | `/workspace` was a public marketing preview route. It is now a server component that redirects anonymous visitors to `/login?next=/workspace`, and `/workspace` joined the protected-route list in the sign-out assertions. E2E asserts the redirect **and** that its `Location` points at sign-in. |
+| Login redesigned | New two-column auth layout (`min(0,1.35fr)` form / `min(0,1fr)` aside at ≥900px, single column below). Replaced the cramped card: clearer eyebrow → title → description rhythm, segmented sign-in/create switch with real hover/pressed states, 46px inputs with consistent 8px field gaps and 18px form gaps, 48px crimson submit with hover/active/disabled states, and an honest footnote about OAuth. Added a `next` parameter that only accepts same-origin absolute paths, so it cannot be used as an open redirect. Page is wrapped in `Suspense` because the form now reads search params. |
+| Navigation rebuilt | Removed the "Workspace preview" item and the Explore `<details>` mega-menu. Navigation is now flat real page routes: Product, Workflow, Pricing, DESIGN.md (Soon), Website import (Soon), Mavent. Actions are **Sign in** (secondary, borderless until hover) and **Open workspace** (primary crimson) pointing at `/login?next=/projects`. Mobile uses an explicit Menu/Close button with `aria-expanded`/`aria-controls`, Escape-to-close, and a full-width stacked panel. Coming Soon is marked with a small mono badge instead of a fake link. |
+| Button/spacing system | Consistent 8–12px control padding, `--radius-sm` buttons, 12–14px radii for cards and panels, 2px segmented-control insets, and focus-visible rings throughout. `prefers-reduced-motion` disables the transitions and hover translate. |
+| Backend contracts preserved | No API, schema, auth, or persistence behaviour changed — this batch is presentation and routing only. Every previously verified journey still passes. |
+| Verification | `typecheck` PASS, `lint` PASS, unit 87/87 PASS, full production E2E PASS (all journeys, including the new workspace gate assertions). |
+| Remaining Phase E work | Landing hero/product-proof polish, workspace canvas + inspector visual refinement, provider/Composer surface refinement, product hub, motion pass, and the responsive/anti-slop audit. |
+| Next action | Continue Phase E across the remaining surfaces, then run the full regression gate again. |
+
 ### 2026-09-27 — Phase D: production readiness check
 
 | Field | Evidence |
