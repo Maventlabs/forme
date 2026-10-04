@@ -889,6 +889,18 @@ Local synthetic fixtures may validate schemas and queries but must never be repo
 | Blockers | Kredensial real untuk 11 provider non-Gemini belum tersedia (expected); `E2E_OPENAI_COMPATIBLE_*` opsional bila owner menyediakan; public deploy tetap menunggu DB production + domain + env final. |
 | Next action | Fresh production build + `pnpm e2e:production` (wajib Gemini bila `E2E_REQUIRE_GEMINI=true`); lalu scoped `appendChild`, timeout recovery, dan P0 lanjutan sesuai dependency order. |
 
+### 2026-09-27 — Phase B: real UI surfaces wired to the verified backend
+
+| Field | Evidence |
+|---|---|
+| Dead UI removed | The workspace inspector previously shipped two dead placeholders — "Sharing arrives later" and "Export arrives later". Both are gone, replaced by real controls. E2E now asserts those strings are **absent** from the server-rendered workspace. |
+| Surfaces wired | New `project-controls.tsx` (+ CSS) inside the workspace inspector: **Presets** (lists the real curated catalog and applies a selection through `POST /preset`), **DESIGN.md** (paste/write in a textarea, "Parse and apply", with honest "Automatic generation is Coming Soon" copy), **Assets** (file input → prepare → presigned `PUT` → confirm → list/delete, with an explicit message when storage is unconfigured), **Share** (create link, copy, expiry-aware list, revoke), **Export** (real JSON + SVG download built from the saved canvas). |
+| Public share page | New `/share/[token]` renders the real read-only SVG wireframe. Unknown, revoked and expired tokens all render 404, so they are indistinguishable. |
+| Honesty | No fake download, upload or generation. Asset upload performs the real three-step presigned flow and reports `STORAGE_UNAVAILABLE` truthfully. Export downloads a blob produced by the server from persisted state. Share links are revealed only once, matching the backend contract. |
+| Tests | `typecheck` PASS, `lint` PASS, unit **87/87** PASS. |
+| Production E2E | PASS. Workspace SSR assertions now require the new controls and forbid the old placeholders. New journey asserts the public share page returns 200 while active, renders the real node artifact, states "Read-only share", leaks no session cookie, and returns 404 once revoked. |
+| Next action | Phase D production-readiness check, then the final frontend redesign/polish pass. |
+
 ### 2026-09-27 — Phase A: security + observability hardening
 
 | Field | Evidence |
