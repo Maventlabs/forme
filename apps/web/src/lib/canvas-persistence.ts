@@ -5,7 +5,7 @@ import { projects } from '@/db/schema'
 
 export function getOwnedProjectCanvas(projectId: string, userId: string) {
   return getDb()
-    .select({ id: projects.id, canvas: projects.canvas, revision: projects.canvasRevision })
+    .select({ id: projects.id, name: projects.name, canvas: projects.canvas, revision: projects.canvasRevision })
     .from(projects)
     .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
     .limit(1)

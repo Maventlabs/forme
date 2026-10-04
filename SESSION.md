@@ -889,6 +889,20 @@ Local synthetic fixtures may validate schemas and queries but must never be repo
 | Blockers | Kredensial real untuk 11 provider non-Gemini belum tersedia (expected); `E2E_OPENAI_COMPATIBLE_*` opsional bila owner menyediakan; public deploy tetap menunggu DB production + domain + env final. |
 | Next action | Fresh production build + `pnpm e2e:production` (wajib Gemini bila `E2E_REQUIRE_GEMINI=true`); lalu scoped `appendChild`, timeout recovery, dan P0 lanjutan sesuai dependency order. |
 
+### 2026-09-27 — DESIGN.md context, curated presets, export, and read-only share (P0 batch)
+
+| Field | Evidence |
+|---|---|
+| Scope | New P0 durable slices: curated presets (10, code-owned product content), manual `DESIGN.md` context (paste/upload/manual), real export artifacts (Design IR JSON + grayscale SVG), and revocable read-only share links. All committed through the existing optimistic-revision persistence path. |
+| Presets / DESIGN.md safety | `design-apply.ts` writes **presentation only** (spacing/gap per breakpoint + `styleRef`). Structural fingerprint (ids, blockId/type, parent/children, root order, visibility, props) is asserted identical before/after in both unit tests and production E2E. Tokens are written as absolute depth-derived values, so applying the same preset twice is idempotent. `DESIGN.md` parsing is line-anchored, range-clamped, note-bounded, and never executes document content. Automatic generation stays Coming Soon. |
+| Export | `GET /api/projects/:id/export?format=json|svg&breakpoint=…` builds a **real artifact** from persisted state: parseable Design IR JSON, and an SVG wireframe that is grayscale-only (asserted: no `#7D070B`) with XML-escaped node text so project content cannot inject markup. Owner-scoped; other users get 404. |
+| Share | `POST/GET /api/projects/:id/shares`, `DELETE …/shares/:shareId`, public read-only `GET /api/share/:token`. Token is 32 random bytes, returned exactly once; only a SHA-256 hash is persisted (asserted). Expiry + revoke both enforced. Public view exposes **only** name + canvas — asserted to never expose owner identity or provider data. |
+| Database | Migration `0003_next_mongoose.sql` adds `design_contexts` (unique active context per project) and `share_links` (unique token hash) with owner FKs and cascade delete. Applied to isolated Neon `forme-dev`. `getOwnedProjectCanvas` now also selects `name` (required by export); ownership semantics unchanged. |
+| Tests | `typecheck` PASS, `lint` PASS, `pnpm --filter @forme/web test` **75/75** PASS. |
+| Production E2E | PASS via `pnpm e2e:production` (build-identity gated, unique port/run id): all prior journeys plus preset listing (≥10), unknown-preset 404, preset apply with unchanged structure and preserved content, `DESIGN.md` without rules rejected 422, real DESIGN.md parse + apply + durable `design_contexts` row, stale-revision 409, JSON export content/type assertions, SVG export containing persisted nodes and no brand color, invalid format 422, cross-user export/share denial 404, share token entropy + hash-only persistence, anonymous read-only resolution with no owner/provider leakage, revoke → 404, full cleanup. |
+| Remaining P0 | S3-compatible storage abstraction + real upload persistence; remaining security/observability hardening; UI surfaces for presets/context/share/export; final frontend redesign. |
+| Next action | Implement the storage abstraction and asset persistence, then security/observability pass. |
+
 ### 2026-09-27 — Git reconciliation + controlled E2E + scoped appendChild + timeout recovery
 
 | Field | Evidence |

@@ -12,6 +12,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { createEmptyCanvasDocument, type CanvasDocument } from '@forme/design-ir'
+import type { DesignContextRules } from '@/lib/design-context-rules'
 import type { ProviderModel } from '@/lib/provider-types'
 
 const createdAt = (name = 'created_at') => timestamp(name, { withTimezone: true }).defaultNow().notNull()
@@ -128,4 +129,37 @@ export const aiGenerationJobs = pgTable('ai_generation_jobs', {
   check('ai_generation_jobs_status_check', sql`${table.status} in ('running', 'succeeded', 'failed', 'unknown')`),
 ])
 
-export const schema = { user, session, account, verification, projects, providerConnections, modelCache, aiGenerationJobs }
+export const designContexts = pgTable('design_contexts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  sourceType: text('source_type').$type<'paste' | 'upload' | 'manual'>().notNull(),
+  fileName: text('file_name'),
+  rawContent: text('raw_content').notNull(),
+  parsedRules: jsonb('parsed_rules').$type<DesignContextRules>().notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  appliedAt: timestamp('applied_at', { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => [
+  index('design_contexts_project_created_at_idx').on(table.projectId, table.createdAt),
+  uniqueIndex('design_contexts_project_active_unique').on(table.projectId).where(sql`${table.isActive} = true`),
+])
+
+export const shareLinks = pgTable('share_links', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  ownerId: text('owner_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull(),
+  tokenPrefix: text('token_prefix').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  viewCount: integer('view_count').default(0).notNull(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => [
+  uniqueIndex('share_links_token_hash_unique').on(table.tokenHash),
+  index('share_links_project_created_at_idx').on(table.projectId, table.createdAt),
+])
+
+export const schema = { user, session, account, verification, projects, providerConnections, modelCache, aiGenerationJobs, designContexts, shareLinks }

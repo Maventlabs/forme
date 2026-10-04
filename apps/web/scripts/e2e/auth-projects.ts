@@ -924,6 +924,8 @@ async function run(baseUrl: URL, pool: Pool) {
 
   await runGeminiJourney(baseUrl, pool, ownerId, ownerJar, otherJar)
 
+  await runDesignContextAndSharingJourney(baseUrl, pool, ownerJar, otherJar)
+
   const ownerSignOut = await request(baseUrl, '/api/auth/sign-out', { method: 'POST', json: {}, jar: ownerJar })
   const signOutBody = await ownerSignOut.clone().json().catch(() => undefined) as { code?: unknown } | undefined
   assert.equal(ownerSignOut.ok, true, `owner sign-out must complete (HTTP ${ownerSignOut.status}${typeof signOutBody?.code === 'string' ? ` ${signOutBody.code}` : ''})`)
@@ -939,6 +941,180 @@ async function run(baseUrl: URL, pool: Pool) {
   await request(baseUrl, '/api/auth/sign-out', { method: 'POST', json: {}, jar: ownerSignupJar })
   await request(baseUrl, '/api/auth/sign-out', { method: 'POST', json: {}, jar: otherJar })
   pass('sign-out and unauthenticated access denial')
+}
+
+async function runDesignContextAndSharingJourney(baseUrl: URL, pool: Pool, ownerJar: CookieJar, otherJar: CookieJar) {
+  const created = await request(baseUrl, '/api/projects', {
+    method: 'POST',
+    json: { name: `FORME E2E context ${runId}` },
+    jar: ownerJar,
+  })
+  assert.equal(created.status, 201, 'design-context project must be created')
+  const projectId = (await created.json() as { project?: { id?: string } }).project?.id
+  assert.equal(typeof projectId, 'string')
+  projectIds.add(projectId as string)
+
+  const containerNodeId = randomUUID()
+  const headingNodeId = randomUUID()
+  let nodeCreate = await request(baseUrl, '/api/nodes', {
+    method: 'POST',
+    json: { projectId, expectedRevision: 0, id: containerNodeId, blockId: 'container', label: 'Section' },
+    jar: ownerJar,
+  })
+  assert.equal(nodeCreate.status, 201, 'context journey must create a container node')
+  nodeCreate = await request(baseUrl, '/api/nodes', {
+    method: 'POST',
+    json: { projectId, expectedRevision: 1, id: headingNodeId, blockId: 'heading', parentId: containerNodeId, label: 'Section title', props: { text: 'Original heading' } },
+    jar: ownerJar,
+  })
+  assert.equal(nodeCreate.status, 201, 'context journey must create a nested heading node')
+
+  const beforeDesign = await request(baseUrl, `/api/projects/${projectId}`, { jar: ownerJar })
+  const beforeProject = await beforeDesign.json() as { project?: { canvas?: CanvasDocument; revision?: number } }
+  const structureBefore = JSON.stringify({
+    rootIds: beforeProject.project?.canvas?.rootIds,
+    nodes: Object.fromEntries(Object.entries(beforeProject.project?.canvas?.nodes ?? {}).map(([id, node]) => [id, { id: node.id, blockId: node.blockId, type: node.type, parentId: node.parentId, children: node.children, props: node.props }])),
+  })
+
+  // --- curated presets ---
+  const presetList = await request(baseUrl, `/api/projects/${projectId}/preset`, { jar: ownerJar })
+  assert.equal(presetList.ok, true, 'curated presets must be listable')
+  const presets = (await presetList.json() as { presets?: Array<{ id?: string }> }).presets ?? []
+  assert.ok(presets.length >= 10, `at least 10 curated presets are required, saw ${presets.length}`)
+
+  const unknownPreset = await request(baseUrl, `/api/projects/${projectId}/preset`, {
+    method: 'POST', json: { presetId: 'not-a-real-preset', expectedRevision: 2 }, jar: ownerJar,
+  })
+  assert.equal(unknownPreset.status, 404, 'unknown preset must be rejected')
+
+  const appliedPreset = await request(baseUrl, `/api/projects/${projectId}/preset`, {
+    method: 'POST', json: { presetId: 'dense-ops', expectedRevision: 2 }, jar: ownerJar,
+  })
+  assert.equal(appliedPreset.status, 200, 'preset must be applicable after the wireframe exists')
+  const appliedPresetResult = await appliedPreset.json() as { revision?: number; project?: never }
+  assert.equal(appliedPresetResult.revision, 3, 'applying a preset must persist exactly one revision')
+
+  const afterPreset = await request(baseUrl, `/api/projects/${projectId}`, { jar: ownerJar })
+  const afterPresetProject = await afterPreset.json() as { project?: { canvas?: CanvasDocument } }
+  const structureAfterPreset = JSON.stringify({
+    rootIds: afterPresetProject.project?.canvas?.rootIds,
+    nodes: Object.fromEntries(Object.entries(afterPresetProject.project?.canvas?.nodes ?? {}).map(([id, node]) => [id, { id: node.id, blockId: node.blockId, type: node.type, parentId: node.parentId, children: node.children, props: node.props }])),
+  })
+  assert.equal(structureAfterPreset, structureBefore, 'preset application must not change semantic structure')
+  assert.equal(
+    afterPresetProject.project?.canvas?.nodes?.[containerNodeId]?.styleRef,
+    'forme:preset/dense-ops',
+    'applied preset must be recorded on the canvas nodes',
+  )
+  assert.equal(afterPresetProject.project?.canvas?.nodes?.[headingNodeId]?.props.text, 'Original heading', 'preset must not rewrite content')
+
+  // --- manual DESIGN.md context ---
+  const designDocument = [
+    '# Project design context',
+    'font-family: Instrument Sans',
+    'spacing unit: 12',
+    'radius: 10',
+    'density: spacious',
+    'max-width: 1280',
+    'section gap: 96',
+  ].join('\n')
+
+  const noRules = await request(baseUrl, `/api/projects/${projectId}/design-context`, {
+    method: 'POST', json: { sourceType: 'paste', content: 'just some prose with no tokens', expectedRevision: 3, apply: true }, jar: ownerJar,
+  })
+  assert.equal(noRules.status, 422, 'a DESIGN.md without recognisable rules must be rejected honestly')
+
+  const savedContext = await request(baseUrl, `/api/projects/${projectId}/design-context`, {
+    method: 'POST', json: { sourceType: 'paste', content: designDocument, expectedRevision: 3, apply: true }, jar: ownerJar,
+  })
+  assert.equal(savedContext.status, 201, 'manual DESIGN.md context must be persisted')
+  const savedContextResult = await savedContext.json() as { revision?: number; context?: { parsedRules?: { spacingUnit?: number; density?: string } } }
+  assert.equal(savedContextResult.revision, 4, 'applying DESIGN.md must persist exactly one revision')
+  assert.equal(savedContextResult.context?.parsedRules?.spacingUnit, 12, 'parsed spacing rule must round-trip')
+  assert.equal(savedContextResult.context?.parsedRules?.density, 'spacious', 'parsed density must round-trip')
+
+  const contextRows = await pool.query<{ id: string; is_active: boolean; raw_content: string }>(
+    'SELECT id, is_active, raw_content FROM design_contexts WHERE project_id = $1::uuid ORDER BY created_at',
+    [projectId],
+  )
+  assert.equal(contextRows.rowCount, 1, 'design context must be durably persisted')
+  assert.equal(contextRows.rows[0]?.is_active, true, 'the newest design context must be active')
+
+  const afterContext = await request(baseUrl, `/api/projects/${projectId}`, { jar: ownerJar })
+  const afterContextProject = await afterContext.json() as { project?: { canvas?: CanvasDocument } }
+  const structureAfterContext = JSON.stringify({
+    rootIds: afterContextProject.project?.canvas?.rootIds,
+    nodes: Object.fromEntries(Object.entries(afterContextProject.project?.canvas?.nodes ?? {}).map(([id, node]) => [id, { id: node.id, blockId: node.blockId, type: node.type, parentId: node.parentId, children: node.children, props: node.props }])),
+  })
+  assert.equal(structureAfterContext, structureBefore, 'DESIGN.md application must not destroy semantic structure')
+  assert.ok(
+    afterContextProject.project?.canvas?.nodes?.[containerNodeId]?.styleRef?.startsWith('forme:design-context/'),
+    'DESIGN.md application must be recorded on the canvas nodes',
+  )
+
+  const staleContext = await request(baseUrl, `/api/projects/${projectId}/design-context`, {
+    method: 'POST', json: { sourceType: 'manual', content: designDocument, expectedRevision: 1, apply: true }, jar: ownerJar,
+  })
+  assert.equal(staleContext.status, 409, 'stale DESIGN.md application must be rejected by revision check')
+
+  // --- real export artifact ---
+  const jsonExport = await request(baseUrl, `/api/projects/${projectId}/export?format=json`, { jar: ownerJar })
+  assert.equal(jsonExport.status, 200, 'JSON export must succeed')
+  assert.match(jsonExport.headers.get('content-type') ?? '', /application\/json/, 'JSON export must declare its content type')
+  const exportPayload = await jsonExport.json() as { format?: string; nodes?: Record<string, unknown>; rootIds?: string[] }
+  assert.equal(exportPayload.format, 'forme-design-ir', 'export must be a real Design IR artifact')
+  assert.ok(Object.keys(exportPayload.nodes ?? {}).length >= 2, 'export must contain the persisted nodes')
+  assert.ok((exportPayload.rootIds ?? []).length >= 1)
+
+  const svgExport = await request(baseUrl, `/api/projects/${projectId}/export?format=svg`, { jar: ownerJar })
+  assert.equal(svgExport.status, 200, 'SVG export must succeed')
+  assert.match(svgExport.headers.get('content-type') ?? '', /image\/svg\+xml/, 'SVG export must declare its content type')
+  const svg = await svgExport.text()
+  assert.match(svg, /^<svg /, 'SVG export must be an SVG document')
+  assert.ok(svg.includes(`data-node-id="${containerNodeId}"`), 'SVG export must render the persisted container')
+  assert.ok(svg.includes('Original heading'), 'SVG export must render persisted node content')
+  assert.ok(!svg.includes('#7D070B'), 'wireframe export must stay grayscale')
+
+  const badFormat = await request(baseUrl, `/api/projects/${projectId}/export?format=exe`, { jar: ownerJar })
+  assert.equal(badFormat.status, 422, 'unknown export format must be rejected')
+
+  // --- read-only sharing ---
+  const otherExport = await request(baseUrl, `/api/projects/${projectId}/export?format=json`, { jar: otherJar })
+  assert.equal(otherExport.status, 404, 'other users must not export a private project')
+  const otherShareCreate = await request(baseUrl, `/api/projects/${projectId}/shares`, { method: 'POST', json: {}, jar: otherJar })
+  assert.equal(otherShareCreate.status, 404, 'other users must not create share links for a private project')
+
+  const shareCreated = await request(baseUrl, `/api/projects/${projectId}/shares`, {
+    method: 'POST', json: { expiresInDays: 7 }, jar: ownerJar,
+  })
+  assert.equal(shareCreated.status, 201, 'owner must be able to create a read-only share link')
+  const sharePayload = await shareCreated.json() as { share?: { id?: string; token?: string } }
+  const shareToken = sharePayload.share?.token
+  assert.equal(typeof shareToken, 'string', 'share creation must return a high-entropy token exactly once')
+  assert.ok((shareToken as string).length >= 32, 'share token must carry real entropy')
+
+  const anonymousShare = await request(baseUrl, `/api/share/${shareToken}`)
+  assert.equal(anonymousShare.status, 200, 'share token must resolve without a session')
+  const sharedView = await anonymousShare.json() as { share?: { readOnly?: boolean }; project?: { name?: string; canvas?: CanvasDocument }; userId?: unknown; provider?: unknown }
+  assert.equal(sharedView.share?.readOnly, true, 'shared project must be marked read-only')
+  assert.equal(sharedView.project?.name, `FORME E2E context ${runId}`, 'shared view must expose the project name')
+  assert.ok(Object.keys(sharedView.project?.canvas?.nodes ?? {}).length >= 2, 'shared view must expose the canvas')
+  assert.equal(sharedView.userId, undefined, 'shared view must never expose owner identity')
+  assert.equal(sharedView.provider, undefined, 'shared view must never expose provider data')
+
+  const shareRow = await pool.query<{ token_hash: string }>('SELECT token_hash FROM share_links WHERE id = $1::uuid', [sharePayload.share!.id])
+  assert.ok(shareRow.rows[0]?.token_hash, 'share token hash must be persisted')
+  assert.notEqual(shareRow.rows[0]?.token_hash, shareToken, 'the raw share token must never be stored')
+
+  const unknownShare = await request(baseUrl, '/api/share/not-a-real-share-token-value')
+  assert.equal(unknownShare.status, 404, 'an unknown share token must 404')
+
+  const revoked = await request(baseUrl, `/api/projects/${projectId}/shares/${sharePayload.share!.id}`, { method: 'DELETE', jar: ownerJar })
+  assert.equal(revoked.status, 204, 'owner must be able to revoke a share link')
+  const afterRevoke = await request(baseUrl, `/api/share/${shareToken}`)
+  assert.equal(afterRevoke.status, 404, 'a revoked share token must stop resolving')
+
+  pass('curated presets, manual DESIGN.md context, real JSON/SVG export, and revocable read-only share links preserve semantic structure and never leak private data')
 }
 
 export async function runProductionE2E(targetBaseUrl: URL, databaseUrl: string) {

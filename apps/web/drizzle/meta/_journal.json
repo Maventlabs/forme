@@ -22,6 +22,13 @@
       "when": 1790421248090,
       "tag": "0002_sweet_tusk",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791093198971,
+      "tag": "0003_next_mongoose",
+      "breakpoints": true
     }
   ]
 }
