@@ -889,6 +889,22 @@ Local synthetic fixtures may validate schemas and queries but must never be repo
 | Blockers | Kredensial real untuk 11 provider non-Gemini belum tersedia (expected); `E2E_OPENAI_COMPATIBLE_*` opsional bila owner menyediakan; public deploy tetap menunggu DB production + domain + env final. |
 | Next action | Fresh production build + `pnpm e2e:production` (wajib Gemini bila `E2E_REQUIRE_GEMINI=true`); lalu scoped `appendChild`, timeout recovery, dan P0 lanjutan sesuai dependency order. |
 
+### 2026-09-27 — Phase D: production readiness check
+
+| Field | Evidence |
+|---|---|
+| Real gap found and fixed | `src/lib/auth.ts` silently fell back to `http://localhost:3100` when `BETTER_AUTH_URL` was unset, which in production would install a wrong trusted origin and break callbacks in a hard-to-diagnose way. Now both `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` fail fast in production, while module import stays build-safe (Netlify's build has no runtime secrets). |
+| New readiness check | `scripts/production-readiness.ts` asserts both fail-fast behaviours and that `netlify.toml` declares **no** secret variable. Output: `PASS | production env fails fast and netlify.toml declares no secrets`. |
+| Migrations | Four migrations applied in order to the isolated Neon database (`0000`–`0004`): auth/projects, provider connections + model cache, generation jobs, design contexts + share links, assets. All additive with owner FKs and cascade deletes; no destructive step. |
+| No dev-only fallback reachable in production | Lazy auth, lazy storage (`null` when unconfigured → honest `503`), lazy provider decryption, and fail-fast env checks. No mock or in-memory fallback can satisfy a production request. |
+| No fake success path | Storage returns `STORAGE_UNAVAILABLE` and writes no metadata row; Ignix and automatic DESIGN.md generation stay Coming Soon; provider credential verification is never claimed without a credential. |
+| Secrets | `.env.local` never staged (verified every commit). Repo scan finds secret-shaped literals only inside a redaction unit test, where they are deliberate dummies. `netlify.toml` holds build config and security headers only. |
+| Observability sufficiency | Provider, AI, storage, share, export, design-context, preset and auth/security boundaries all emit redacted structured JSON with a request correlation id, so a provider or storage failure is diagnosable without exposing payloads. |
+| Long-running work | Still synchronous; provider calls are bounded (10s discovery / 25s generation) and Netlify's 60s function ceiling is respected. Anything longer belongs to the planned worker architecture and is documented as such rather than faked. |
+| Verification | `typecheck` PASS, `lint` PASS, unit **87/87** PASS, readiness script PASS, full production E2E PASS (20 journeys, real Gemini, build-identity gated). |
+| Remaining evidence gaps (not blockers) | Real S3 durability (needs `S3_*` credentials); credential verification for the 10 non-Gemini providers; deployed-environment E2E against the Netlify URL with a production database; browser-only visual/keyboard QA. |
+| Next action | Phase E — final full frontend redesign and visual polish, preserving every verified backend contract. |
+
 ### 2026-09-27 — Phase B: real UI surfaces wired to the verified backend
 
 | Field | Evidence |

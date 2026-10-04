@@ -9,11 +9,18 @@ import { schema } from '@/db/schema'
 // validated fail-fast when the first request actually needs auth, never at
 // import time, so static/landing builds are not blocked unnecessarily.
 function createAuth() {
-  const baseURL = process.env.BETTER_AUTH_URL ?? 'http://localhost:3100'
-  const secret = process.env.BETTER_AUTH_SECRET
+  const isProduction = process.env.NODE_ENV === 'production'
+  const baseURL = process.env.BETTER_AUTH_URL?.trim() || (isProduction ? '' : 'http://localhost:3100')
+  const secret = process.env.BETTER_AUTH_SECRET?.trim()
 
-  if (process.env.NODE_ENV === 'production' && !secret) {
+  // Fail fast in production rather than silently trusting a localhost origin:
+  // a wrong base URL would break trusted origins and OAuth-style callbacks in
+  // ways that are very hard to diagnose from the outside.
+  if (isProduction && !secret) {
     throw new Error('BETTER_AUTH_SECRET is required in production')
+  }
+  if (isProduction && !baseURL) {
+    throw new Error('BETTER_AUTH_URL is required in production')
   }
 
   return betterAuth({
